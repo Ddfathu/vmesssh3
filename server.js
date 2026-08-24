@@ -302,7 +302,16 @@ function deleteSsh(username) {
     }
 }
 
-function readPathsFromFile(filename, defaultPath) { try { if (fs.existsSync(filename)) { const content = fs.readFileSync(filename, 'utf-8'); const paths = content.split('\n').map(p => p.trim()).filter(p => p.startsWith('/')); if (paths.length > 0) return paths; } } catch (e) {} return [defaultPath]; }
+function readPathsFromFile(filename, defaultPath) { 
+  try { 
+    if (fs.existsSync(filename)) { 
+      const content = fs.readFileSync(filename, 'utf-8'); 
+      const paths = content.split('\n').map(p => p.trim()).filter(p => p.startsWith('/')); 
+      if (paths.length > 0) return paths; 
+    } 
+  } catch (e) {} 
+  return [defaultPath]; 
+}
 
 async function generateConfig() {
   const netSettings = getNetworkSettings();
@@ -1079,7 +1088,6 @@ const server = http.createServer(async (req, res) => {
                             <input id="bugInput" type="text" value="v.whatsapp.net" class="input-ssh" style="font-family: monospace;">
                           </div>
 
-                          <!-- REALITY / RAILWAY CONFIG (SESUAI STRUKTUR DARKTUNNEL) -->
                           <div class="border-lbl" style="color: #00ff88; border-color: #00ff88;">REALITY / RAILWAY (DARKTUNNEL FORMAT)</div>
                           <div class="grid-3">
                             <button onclick="buildRealityConfig('vless', event)" class="btn-blue" style="border-color:#00ff88;">VLESS REALITY</button>
@@ -1517,14 +1525,13 @@ const server = http.createServer(async (req, res) => {
                   } catch (e) {}
                 }
 
-                // GENERATOR STRUKTUR REALITY / DARKTUNNEL (PERSIS FOTO)
                 function buildRealityConfig(protocol, evt) {
-                  document.querySelectorAll('.btn-blue').forEach(b => b.classList.remove('btn-active'));
+                  document.querySelectorAll('.btn-blue').forEach(function(b) { b.classList.remove('btn-active'); });
                   if(evt && evt.target) evt.target.classList.add('btn-active');
 
                   const uuid = document.getElementById('uuidInput').value.trim();
                   let targetHost = railwayDomainStored || document.getElementById('domainSelect').value.trim();
-                  targetHost = targetHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                  targetHost = targetHost.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');
                   const bugHost = document.getElementById('bugInput').value.trim() || 'v.whatsapp.net';
                   
                   const pathsMapping = window.serverActivePaths || { vless: '/vless-argo', vmess: '/vmess-argo', trojan: '/trojan-argo' };
@@ -1536,7 +1543,6 @@ const server = http.createServer(async (req, res) => {
 
                   let protoLabel = (protocol === 'vless' ? 'VLess' : (protocol === 'vmess' ? 'VMess' : 'Trojan'));
 
-                  // Menampilkan Raw Link URI + Format Pengaturan DarkTunnel persis di Screenshot
                   let uriLink = '';
                   if (protocol === 'vless') {
                     uriLink = 'vless://' + uuid + '@' + targetHost + ':443?encryption=none&security=tls&sni=' + bugHost + '&fp=firefox&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#REALITY-' + targetHost;
@@ -1548,18 +1554,18 @@ const server = http.createServer(async (req, res) => {
                   }
 
                   let darkTunnelFormat = 
-`========================================
-    DARKTUNNEL FORMAT (${protoLabel} REALITY)
-========================================
-Protocol               : ${protoLabel} • Websocket SSL/TLS
-target server          : ${targetHost}:443
-uuid / password        : ${uuid}
-path                   : ${basePath}
-server name indication : ${bugHost}
-header host            : ${targetHost}
-========================================
-RAW LINK URI:
-${uriLink}`;
+"========================================\\n" +
+"    DARKTUNNEL FORMAT (" + protoLabel + " REALITY)\\n" +
+"========================================\\n" +
+"Protocol               : " + protoLabel + " • Websocket SSL/TLS\\n" +
+"target server          : " + targetHost + ":443\\n" +
+"uuid / password        : " + uuid + "\\n" +
+"path                   : " + basePath + "\\n" +
+"server name indication : " + bugHost + "\\n" +
+"header host            : " + targetHost + "\\n" +
+"========================================\\n" +
+"RAW LINK URI:\\n" +
+uriLink;
 
                   label.innerText = 'REALITY - ' + protoLabel.toUpperCase();
                   txt.innerText = darkTunnelFormat;
@@ -1567,12 +1573,12 @@ ${uriLink}`;
                 }
 
                 function buildConfig(protocol, type, evt) {
-                  document.querySelectorAll('.btn-blue').forEach(b => b.classList.remove('btn-active'));
+                  document.querySelectorAll('.btn-blue').forEach(function(b) { b.classList.remove('btn-active'); });
                   if(evt && evt.target) evt.target.classList.add('btn-active');
                   
                   const uuid = document.getElementById('uuidInput').value.trim();
                   const hostSelect = document.getElementById('domainSelect');
-                  const host = hostSelect.value.trim().replace(/^https?:\/\//, ''); 
+                  const host = hostSelect.value.trim().replace(/^https?:\\/\\//, ''); 
                   const bugHost = document.getElementById('bugInput').value.trim(); 
                   const engine = document.getElementById('engineSelect').value;
                   const area = document.getElementById('output-area');
@@ -1654,7 +1660,6 @@ ${uriLink}`;
     res.end("Not Found");
 });
 
-// Helper forward TCP stream
 function forwardConnection(targetPort, req, socket, head) {
   const targetConn = require('net').createConnection({ port: targetPort, host: '127.0.0.1' }, () => {
     let rawHeaders = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
@@ -1671,11 +1676,9 @@ function forwardConnection(targetPort, req, socket, head) {
   socket.on('error', () => targetConn.destroy());
 }
 
-// MULTI-GATEWAY PORT 8081 (BROWSER UI + VPN UPGRADE)
 server.on('upgrade', (req, socket, head) => {
   const urlPath = req.url.split('?')[0];
 
-  // 1. Jalur SSH WebSocket
   if (urlPath === '/ssh-ws') {
     const wsCfg = getWsProxyConfig();
     const targetPort = wsCfg.sshPort || 8880;
@@ -1683,7 +1686,6 @@ server.on('upgrade', (req, socket, head) => {
     return;
   }
 
-  // 2. Jalur VPN DarkTunnel (VMess, VLess, Trojan) -> Port 8001
   const vlessPaths = readPathsFromFile('pathvless.txt', '/vless-argo');
   const vmessPaths = readPathsFromFile('pathvmess.txt', '/vmess-argo');
   const trojanPaths = readPathsFromFile('pathtrojan.txt', '/trojan-argo');
