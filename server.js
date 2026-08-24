@@ -1088,7 +1088,7 @@ const server = http.createServer(async (req, res) => {
                             <input id="bugInput" type="text" value="v.whatsapp.net" class="input-ssh" style="font-family: monospace;">
                           </div>
 
-                          <div class="border-lbl" style="color: #00ff88; border-color: #00ff88;">REALITY / RAILWAY (DARKTUNNEL FORMAT)</div>
+                          <div class="border-lbl" style="color: #00ff88; border-color: #00ff88;">REALITY / RAILWAY</div>
                           <div class="grid-3">
                             <button onclick="buildRealityConfig('vless', event)" class="btn-blue" style="border-color:#00ff88;">VLESS REALITY</button>
                             <button onclick="buildRealityConfig('vmess', event)" class="btn-blue" style="border-color:#00ff88;">VMESS REALITY</button>
@@ -1541,34 +1541,21 @@ const server = http.createServer(async (req, res) => {
                   const label = document.getElementById('out-type');
                   const txt = document.getElementById('configText');
 
-                  let protoLabel = (protocol === 'vless' ? 'VLess' : (protocol === 'vmess' ? 'VMess' : 'Trojan'));
+                  let protoLabel = (protocol === 'vless' ? 'VLESS' : (protocol === 'vmess' ? 'VMESS' : 'TROJAN'));
+                  let remark = 'REALITY-' + protoLabel + '-' + targetHost;
 
                   let uriLink = '';
                   if (protocol === 'vless') {
-                    uriLink = 'vless://' + uuid + '@' + targetHost + ':443?encryption=none&security=tls&sni=' + bugHost + '&fp=firefox&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#REALITY-' + targetHost;
+                    uriLink = 'vless://' + uuid + '@' + targetHost + ':443?encryption=none&security=tls&sni=' + bugHost + '&fp=firefox&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
                   } else if (protocol === 'vmess') {
-                    let vmessObj = { v: "2", ps: "REALITY-" + targetHost, add: targetHost, port: 443, id: uuid, aid: 0, scy: "auto", net: "ws", type: "none", host: targetHost, path: basePath, tls: "tls", sni: bugHost };
+                    let vmessObj = { v: "2", ps: remark, add: targetHost, port: 443, id: uuid, aid: 0, scy: "auto", net: "ws", type: "none", host: targetHost, path: basePath, tls: "tls", sni: bugHost };
                     uriLink = 'vmess://' + btoa(unescape(encodeURIComponent(JSON.stringify(vmessObj))));
                   } else {
-                    uriLink = 'trojan://' + uuid + '@' + targetHost + ':443?security=tls&sni=' + bugHost + '&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#REALITY-' + targetHost;
+                    uriLink = 'trojan://' + uuid + '@' + targetHost + ':443?security=tls&sni=' + bugHost + '&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
                   }
 
-                  let darkTunnelFormat = 
-"========================================\\n" +
-"    DARKTUNNEL FORMAT (" + protoLabel + " REALITY)\\n" +
-"========================================\\n" +
-"Protocol               : " + protoLabel + " • Websocket SSL/TLS\\n" +
-"target server          : " + targetHost + ":443\\n" +
-"uuid / password        : " + uuid + "\\n" +
-"path                   : " + basePath + "\\n" +
-"server name indication : " + bugHost + "\\n" +
-"header host            : " + targetHost + "\\n" +
-"========================================\\n" +
-"RAW LINK URI:\\n" +
-uriLink;
-
-                  label.innerText = 'REALITY - ' + protoLabel.toUpperCase();
-                  txt.innerText = darkTunnelFormat;
+                  label.innerText = 'REALITY ' + protoLabel;
+                  txt.innerText = uriLink;
                   area.style.display = 'block';
                 }
 
