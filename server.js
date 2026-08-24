@@ -696,9 +696,7 @@ const server = http.createServer(async (req, res) => {
         let rlwyPublicDomain = process.env.RAILWAY_PUBLIC_DOMAIN || "";
         let rlwyTcpDomain = (process.env.RAILWAY_TCP_PROXY_DOMAIN && process.env.RAILWAY_TCP_PROXY_PORT)
             ? `${process.env.RAILWAY_TCP_PROXY_DOMAIN}:${process.env.RAILWAY_TCP_PROXY_PORT}`
-            : "";
-        
-        let rlwyUrl = rlwyPublicDomain || rlwyTcpDomain || (process.env.SNI ? process.env.SNI.replace(/https?:\/\//, '') : "Tidak Aktif");
+            : (process.env.SNI ? process.env.SNI.replace(/https?:\/\//, '') : (hwInfo.railway_proxy || "Tidak Aktif"));
         
         let cleanOnlineStr = String(hwInfo.ssh_online).replace(/👥/g, '').replace(/Active/g, '').replace(/Users/g, '').trim();
         return res.end(JSON.stringify({ 
@@ -707,8 +705,8 @@ const server = http.createServer(async (req, res) => {
             zt_domains: ztSshDomains, 
             zt_vmess_domains: ztVmessDomains, 
             pass_configured: passConfigured, 
-            railway_url: rlwyUrl, 
-            railway_public: rlwyPublicDomain,
+            railway_public: rlwyPublicDomain || "Tidak Aktif",
+            railway_sni: rlwyTcpDomain,
             status: "ONLINE", 
             dns_type: netSettings.dns_type,
             custom_dns: netSettings.custom_dns,
@@ -886,7 +884,7 @@ const server = http.createServer(async (req, res) => {
                             </div>
                         </div>
 
-                        <!-- RAILWAY URL / REALITY SERVER DISPLAY -->
+                        <!-- 1. REALITY SERVER (RAILWAY PUBLIC DOMAIN) -->
                         <div class="url-section">
                             <div class="url-header"><span class="url-title">server vles vmes trojan REALITY</span></div>
                             <div class="url-content-row">
@@ -895,6 +893,16 @@ const server = http.createServer(async (req, res) => {
                             </div>
                         </div>
 
+                        <!-- 2. SSH SNI SERVER (RAILWAY TCP PROXY / SNI) -->
+                        <div class="url-section">
+                            <div class="url-header"><span class="url-title">SSH SNI Server</span></div>
+                            <div class="url-content-row">
+                                <div class="url-box" id="sni-url">Loading...</div>
+                                <button class="btn-copy-mini" id="btn-copy-sni" onclick="copyTxt('sni-url', 'btn-copy-sni')">Copy</button>
+                            </div>
+                        </div>
+
+                        <!-- 3. SSH WS DOMAIN -->
                         <div class="url-section">
                             <div class="url-header"><span class="url-title">SSH WS Domain</span></div>
                             <div class="url-content-row">
@@ -903,6 +911,7 @@ const server = http.createServer(async (req, res) => {
                             </div>
                         </div>
 
+                        <!-- 4. VMESS / VLESS DOMAIN -->
                         <div class="url-section">
                             <div class="url-header"><span class="url-title">VMess / VLess Domain</span></div>
                             <div class="url-content-row">
@@ -911,6 +920,7 @@ const server = http.createServer(async (req, res) => {
                             </div>
                         </div>
 
+                        <!-- 5. QUICK TUNNEL SUB -->
                         <div class="url-section">
                             <div class="url-header"><span class="url-title">Quick Tunnel Sub</span></div>
                             <div class="url-content-row">
@@ -1439,15 +1449,16 @@ const server = http.createServer(async (req, res) => {
                             ztVmessContainer.innerHTML = '<div class="url-box" id="vmess-named-url">Menghubungkan...</div>';
                         }
 
-                        railwayDomainStored = data.railway_public || data.railway_url || "";
-                        document.getElementById('railway-url').innerText = data.railway_url || "Tidak Aktif"; 
+                        railwayDomainStored = data.railway_public && data.railway_public !== "Tidak Aktif" ? data.railway_public : "";
+                        document.getElementById('railway-url').innerText = data.railway_public || "Tidak Aktif"; 
+                        document.getElementById('sni-url').innerText = data.railway_sni || "Tidak Aktif"; 
                         document.getElementById('quick-url').innerText = data.quick_url || "Menunggu Quick Tunnel...";
 
                         let domainSelect = document.getElementById('domainSelect');
                         let currentSelected = domainSelect.value;
                         let optionsHtml = '';
 
-                        if (railwayDomainStored && !railwayDomainStored.includes("Tidak Aktif")) {
+                        if (railwayDomainStored) {
                             optionsHtml += '<option value="' + railwayDomainStored + '">Railway Reality: ' + railwayDomainStored + '</option>';
                         }
 
