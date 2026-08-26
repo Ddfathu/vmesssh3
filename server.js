@@ -461,15 +461,36 @@ async function extractDomains() {
 }
 
 async function getMetaInfo() { try { const res = await axios.get('https://api.ip.sb/geoip'); return `${res.data.country_code}-${res.data.isp}`.replace(/\s+/g, '_'); } catch(e) { return 'RailwayServer'; } }
+
 async function generateLinks(argoDomain) {
-  const ISP = await getMetaInfo(); const nodeName = `${NAME}-${ISP}`;
+  const ISP = await getMetaInfo();
+  const nodeName = `${NAME}-${ISP}`;
   const activeCfip = getActiveCfip();
   const defaultVless = readPathsFromFile('pathvless.txt', '/vless-argo')[0];
   const defaultVmess = readPathsFromFile('pathvmess.txt', '/vmess-argo')[0];
   const defaultTrojan = readPathsFromFile('pathtrojan.txt', '/trojan-argo')[0];
   
-  const VMESS = { v: '2', ps: `${nodeName}`, add: activeCfip, port: CFPORT, id: UUID, aid: '0', scy: 'auto', net: 'ws', type: 'none', host: argoDomain, path: `${defaultVmess}?ed=2560`, tls: 'tls', sni: argoDomain, alpn: '', fp: 'firefox' };
-  const subTxt = `vless://${UUID}@${activeCfip}:${CFPORT}?encryption=none&security=tls&sni=${argoDomain}&fp=firefox&type=ws&host=${argoDomain}&path=${encodeURIComponent(defaultVless + '?ed=2560')}#${nodeName}\n\nvmess://${Buffer.from(JSON.stringify(VMESS)).toString('base64')}\n\ntrojan://${UUID}@${activeCfip}:${CFPORT}?security=tls&sni=${argoDomain}&fp=firefox&type=ws&host=${argoDomain}&path=${encodeURIComponent(defaultTrojan + '?ed=2560')}#${nodeName}`;
+  const vmessObj = {
+    v: "2",
+    ps: nodeName,
+    add: activeCfip,
+    port: String(CFPORT),
+    id: UUID,
+    aid: "0",
+    scy: "auto",
+    net: "ws",
+    type: "none",
+    host: argoDomain,
+    path: defaultVmess,
+    tls: "tls",
+    sni: argoDomain
+  };
+  
+  const vmessLink = `vmess://${Buffer.from(JSON.stringify(vmessObj)).toString('base64')}`;
+  const vlessLink = `vless://${UUID}@${activeCfip}:${CFPORT}?encryption=none&security=tls&sni=${argoDomain}&type=ws&host=${argoDomain}&path=${encodeURIComponent(defaultVless)}#${encodeURIComponent(nodeName)}`;
+  const trojanLink = `trojan://${UUID}@${activeCfip}:${CFPORT}?security=tls&sni=${argoDomain}&type=ws&host=${argoDomain}&path=${encodeURIComponent(defaultTrojan)}#${encodeURIComponent(nodeName)}`;
+  
+  const subTxt = `${vlessLink}\n${vmessLink}\n${trojanLink}`;
   subContent = Buffer.from(subTxt).toString('base64');
   fs.writeFileSync(subPath, subContent);
 }
@@ -1536,6 +1557,10 @@ const server = http.createServer(async (req, res) => {
                   } catch (e) {}
                 }
 
+                function toBase64(str) {
+                  return btoa(unescape(encodeURIComponent(str)));
+                }
+
                 function buildRealityConfig(protocol, evt) {
                   document.querySelectorAll('.btn-blue').forEach(function(b) { b.classList.remove('btn-active'); });
                   if(evt && evt.target) evt.target.classList.add('btn-active');
@@ -1559,8 +1584,8 @@ const server = http.createServer(async (req, res) => {
                   if (protocol === 'vless') {
                     uriLink = 'vless://' + uuid + '@' + targetHost + ':443?encryption=none&security=tls&sni=' + bugHost + '&fp=firefox&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
                   } else if (protocol === 'vmess') {
-                    let vmessObj = { v: "2", ps: remark, add: targetHost, port: 443, id: uuid, aid: 0, scy: "auto", net: "ws", type: "none", host: targetHost, path: basePath, tls: "tls", sni: bugHost };
-                    uriLink = 'vmess://' + btoa(unescape(encodeURIComponent(JSON.stringify(vmessObj))));
+                    let vmessObj = { v: "2", ps: remark, add: targetHost, port: "443", id: uuid, aid: "0", scy: "auto", net: "ws", type: "none", host: targetHost, path: basePath, tls: "tls", sni: bugHost };
+                    uriLink = 'vmess://' + toBase64(JSON.stringify(vmessObj));
                   } else {
                     uriLink = 'trojan://' + uuid + '@' + targetHost + ':443?security=tls&sni=' + bugHost + '&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
                   }
@@ -1576,7 +1601,7 @@ const server = http.createServer(async (req, res) => {
                   
                   const uuid = document.getElementById('uuidInput').value.trim();
                   const hostSelect = document.getElementById('domainSelect');
-                  const host = hostSelect.value.trim().replace(/^https?:\\/\\//, ''); 
+                  const host = hostSelect.value.trim().replace(/^https?:\\/\\//, '').replace(/\\/$/, ''); 
                   const bugHost = document.getElementById('bugInput').value.trim(); 
                   const engine = document.getElementById('engineSelect').value;
                   const area = document.getElementById('output-area');
@@ -1595,44 +1620,51 @@ const server = http.createServer(async (req, res) => {
                   let configResult = '';
                   label.innerText = remark;
 
-                  function safeBtoa(str) {
-                    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
-                      return String.fromCharCode('0x' + p1);
-                    }));
-                  }
-
                   let netType = engine;
+                  let targetConnect = (type === 'sni') ? bugHost : host;
+                  let targetSni = (type === 'sni_reverse') ? bugHost : host;
+                  let targetWsHost = (type === 'sni_reverse') ? bugHost : host;
+                  let finalPath = (type === 'cdn') ? ('/' + bugHost + basePath) : basePath;
 
-                  if (type === 'sni') {
-                    if (protocol === 'vless') {
-                      configResult = 'vless://' + uuid + '@' + bugHost + ':443?encryption=none&security=tls&sni=' + host + '&fp=randomized&type=' + netType + (netType === 'grpc' ? '&serviceName=grpc-service' : (netType === 'h2' ? '&path=/h2-path' : '&host=' + host + '&path=' + encodeURIComponent(basePath))) + '#' + encodeURIComponent(remark);
-                    } else if (protocol === 'vmess') {
-                      let jsonVmess = { v: "2", ps: remark, add: bugHost, port: 443, id: uuid, aid: 0, scy: "auto", net: netType, type: netType === 'grpc' ? 'multi' : 'none', host: host, path: netType === 'grpc' ? 'grpc-service' : (netType === 'h2' ? '/h2-path' : basePath), tls: "tls", sni: host };
-                      configResult = 'vmess://' + safeBtoa(JSON.stringify(jsonVmess));
-                    } else if (protocol === 'trojan') {
-                      configResult = 'trojan://' + uuid + '@' + bugHost + ':443?security=tls&sni=' + host + '&type=' + netType + (netType === 'grpc' ? '&serviceName=grpc-service' : (netType === 'h2' ? '&path=/h2-path' : '&host=' + host + '&path=' + encodeURIComponent(basePath))) + '#' + encodeURIComponent(remark);
+                  if (protocol === 'vless') {
+                    let q = '?encryption=none&security=tls&sni=' + targetSni + '&type=' + netType;
+                    if (netType === 'grpc') {
+                      q += '&serviceName=grpc-service';
+                    } else if (netType === 'h2') {
+                      q += '&host=' + targetWsHost + '&path=/h2-path';
+                    } else if (netType === 'ws') {
+                      q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
                     }
+                    configResult = 'vless://' + uuid + '@' + targetConnect + ':443' + q + '#' + encodeURIComponent(remark);
                   } 
-                  else if (type === 'sni_reverse') {
-                    if (protocol === 'vless') {
-                      configResult = 'vless://' + uuid + '@' + host + ':443?encryption=none&security=tls&sni=' + bugHost + '&fp=randomized&type=' + netType + (netType === 'grpc' ? '&serviceName=grpc-service' : (netType === 'h2' ? '&path=/h2-path' : '&host=' + bugHost + '&path=' + encodeURIComponent(basePath))) + '#' + encodeURIComponent(remark);
-                    } else if (protocol === 'vmess') {
-                      let jsonVmess = { v: "2", ps: remark, add: host, port: 443, id: uuid, aid: 0, scy: "auto", net: netType, type: netType === 'grpc' ? 'multi' : 'none', host: bugHost, path: netType === 'grpc' ? 'grpc-service' : (netType === 'h2' ? '/h2-path' : basePath), tls: "tls", sni: bugHost };
-                      configResult = 'vmess://' + safeBtoa(JSON.stringify(jsonVmess));
-                    } else if (protocol === 'trojan') {
-                      configResult = 'trojan://' + uuid + '@' + host + ':443?security=tls&sni=' + bugHost + '&type=' + netType + (netType === 'grpc' ? '&serviceName=grpc-service' : (netType === 'h2' ? '&path=/h2-path' : '&host=' + bugHost + '&path=' + encodeURIComponent(basePath))) + '#' + encodeURIComponent(remark);
-                    }
+                  else if (protocol === 'vmess') {
+                    let jsonVmess = {
+                      v: "2",
+                      ps: remark,
+                      add: targetConnect,
+                      port: "443",
+                      id: uuid,
+                      aid: "0",
+                      scy: "auto",
+                      net: netType,
+                      type: "none",
+                      host: targetWsHost,
+                      path: (netType === 'grpc' ? 'grpc-service' : (netType === 'h2' ? '/h2-path' : finalPath)),
+                      tls: "tls",
+                      sni: targetSni
+                    };
+                    configResult = 'vmess://' + toBase64(JSON.stringify(jsonVmess));
                   } 
-                  else if (type === 'cdn') {
-                    let pathBug = '/' + bugHost + basePath;
-                    if (protocol === 'vless') {
-                      configResult = 'vless://' + uuid + '@' + host + ':443?encryption=none&security=tls&sni=' + host + '&fp=randomized&type=' + netType + (netType === 'grpc' ? '&serviceName=grpc-service' : (netType === 'h2' ? '&path=/h2-path' : '&host=' + host + '&path=' + encodeURIComponent(pathBug))) + '#' + encodeURIComponent(remark);
-                    } else if (protocol === 'vmess') {
-                      let jsonVmess = { v: "2", ps: remark, add: host, port: 443, id: uuid, aid: 0, scy: "auto", net: netType, type: netType === 'grpc' ? 'multi' : 'none', host: host, path: netType === 'grpc' ? 'grpc-service' : (netType === 'h2' ? '/h2-path' : pathBug), tls: "tls", sni: host };
-                      configResult = 'vmess://' + safeBtoa(JSON.stringify(jsonVmess));
-                    } else if (protocol === 'trojan') {
-                      configResult = 'trojan://' + uuid + '@' + host + ':443?security=tls&sni=' + host + '&type=' + netType + (netType === 'grpc' ? '&serviceName=grpc-service' : (netType === 'h2' ? '&path=/h2-path' : '&host=' + host + '&path=' + encodeURIComponent(pathBug))) + '#' + encodeURIComponent(remark);
+                  else if (protocol === 'trojan') {
+                    let q = '?security=tls&sni=' + targetSni + '&type=' + netType;
+                    if (netType === 'grpc') {
+                      q += '&serviceName=grpc-service';
+                    } else if (netType === 'h2') {
+                      q += '&host=' + targetWsHost + '&path=/h2-path';
+                    } else if (netType === 'ws') {
+                      q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
                     }
+                    configResult = 'trojan://' + uuid + '@' + targetConnect + ':443' + q + '#' + encodeURIComponent(remark);
                   }
 
                   txt.innerText = configResult;
