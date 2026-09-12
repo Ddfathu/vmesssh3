@@ -750,94 +750,349 @@ const server = http.createServer(async (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
-                body { font-family: '-apple-system', BlinkMacSystemFont, sans-serif; background: #000000; color: #ffffff; min-height: 100vh; padding: 0; margin: 0; }
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    background: #f8fafc; 
+                    color: #0f172a; 
+                    min-height: 100vh; 
+                    padding: 0; 
+                    margin: 0; 
+                }
                 
-                .navbar { background: #000000; border-bottom: 1px solid #262626; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+                .navbar { 
+                    background: #ffffff; 
+                    border-bottom: 1px solid #e2e8f0; 
+                    padding: 12px 18px; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: space-between; 
+                    position: sticky; 
+                    top: 0; 
+                    z-index: 100;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+                }
                 .nav-left { display: flex; align-items: center; gap: 12px; }
-                .hamburger-btn { background: none; border: 1px solid #262626; color: #ffffff; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; }
-                .hamburger-btn:hover { background: #1a1a1a; }
-                .nav-title { font-size: 13px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
+                .hamburger-btn { 
+                    background: #f1f5f9; 
+                    border: 1px solid #cbd5e1; 
+                    color: #334155; 
+                    font-size: 16px; 
+                    cursor: pointer; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    width: 34px; 
+                    height: 34px; 
+                    border-radius: 8px; 
+                    transition: 0.2s ease;
+                }
+                .hamburger-btn:hover { background: #e2e8f0; }
+                .nav-title { 
+                    font-size: 13px; 
+                    font-weight: 700; 
+                    color: #1e293b; 
+                    text-transform: uppercase; 
+                    letter-spacing: 0.5px; 
+                }
                 
-                .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 998; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+                .sidebar-overlay { 
+                    position: fixed; 
+                    top: 0; 
+                    left: 0; 
+                    width: 100%; 
+                    height: 100%; 
+                    background: rgba(15, 23, 42, 0.4); 
+                    z-index: 998; 
+                    opacity: 0; 
+                    pointer-events: none; 
+                    transition: opacity 0.3s ease; 
+                }
                 .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
                 
-                .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #000000; border-right: 1px solid #262626; z-index: 999; transition: left 0.3s ease; display: flex; flex-direction: column; padding: 20px 0; }
+                .sidebar { 
+                    position: fixed; 
+                    top: 0; 
+                    left: -280px; 
+                    width: 280px; 
+                    height: 100%; 
+                    background: #ffffff; 
+                    border-right: 1px solid #e2e8f0; 
+                    z-index: 999; 
+                    transition: left 0.3s ease; 
+                    display: flex; 
+                    flex-direction: column; 
+                    padding: 20px 0; 
+                    box-shadow: 4px 0 24px rgba(0,0,0,0.05);
+                }
                 .sidebar.active { left: 0; }
-                .sidebar-header { padding: 0 20px 20px 20px; border-bottom: 1px solid #262626; display: flex; justify-content: space-between; align-items: center; }
-                .sidebar-title { font-size: 13px; font-weight: bold; color: #ffffff; }
-                .close-sidebar { background: none; border: none; color: #ffffff; font-size: 18px; cursor: pointer; }
+                .sidebar-header { 
+                    padding: 0 20px 16px 20px; 
+                    border-bottom: 1px solid #f1f5f9; 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                }
+                .sidebar-title { font-size: 13px; font-weight: 700; color: #0f172a; }
+                .close-sidebar { 
+                    background: none; 
+                    border: none; 
+                    color: #64748b; 
+                    font-size: 18px; 
+                    cursor: pointer; 
+                }
                 
-                .sidebar-menu { list-style: none; padding: 15px 0; margin: 0; flex: 1; overflow-y: auto; }
-                .menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; color: #ffffff; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; border-left: 3px solid transparent; }
-                .menu-item:hover, .menu-item.active { background: #141414; color: #ffffff; border-left-color: #ffffff; }
+                .sidebar-menu { list-style: none; padding: 12px 0; margin: 0; flex: 1; overflow-y: auto; }
+                .menu-item { 
+                    padding: 12px 20px; 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 12px; 
+                    color: #475569; 
+                    font-size: 13px; 
+                    font-weight: 600; 
+                    cursor: pointer; 
+                    transition: 0.2s; 
+                    border-left: 3px solid transparent; 
+                }
+                .menu-item:hover { background: #f8fafc; color: #0284c7; }
+                .menu-item.active { 
+                    background: #f0f9ff; 
+                    color: #0284c7; 
+                    border-left-color: #0284c7; 
+                }
 
-                .main-wrapper { display: flex; justify-content: center; padding: 15px 12px; }
-                .container { background: #000000; width: 100%; max-width: 480px; }
+                .main-wrapper { display: flex; justify-content: center; padding: 20px 14px; }
+                .container { width: 100%; max-width: 480px; }
                 
                 .page-section { display: none; }
                 .page-section.active { display: block; }
 
-                .dev-tag { font-size: 10px; color: #ffffff; margin-top: 2px; font-weight: bold; text-align: center; }
-                .btn-login-trigger { background: #000000; color: #ffffff; border: 1px solid #262626; padding: 5px 10px; border-radius: 6px; font-size: 10px; cursor: pointer; font-weight: bold; }
-                .btn-login-trigger:hover { background: #1a1a1a; }
+                .dev-tag { font-size: 10px; color: #64748b; margin-top: 4px; font-weight: 600; text-align: center; }
+                .btn-login-trigger { 
+                    background: #f8fafc; 
+                    color: #334155; 
+                    border: 1px solid #cbd5e1; 
+                    padding: 6px 12px; 
+                    border-radius: 6px; 
+                    font-size: 11px; 
+                    cursor: pointer; 
+                    font-weight: 700; 
+                    transition: 0.2s;
+                }
+                .btn-login-trigger:hover { background: #f1f5f9; border-color: #94a3b8; }
                 
-                .status-container { text-align: center; margin-bottom: 12px; }
-                .status-badge { display: inline-block; background: #000000; color: #ffffff; padding: 4px 10px; border-radius: 50px; font-size: 10px; font-weight: bold; border: 1px solid #262626; }
+                .status-container { text-align: center; margin-bottom: 14px; }
+                .status-badge { 
+                    display: inline-flex; 
+                    align-items: center; 
+                    gap: 6px; 
+                    background: #f0fdf4; 
+                    color: #15803d; 
+                    padding: 5px 14px; 
+                    border-radius: 9999px; 
+                    font-size: 11px; 
+                    font-weight: 700; 
+                    border: 1px solid #bbf7d0; 
+                }
+                .status-badge::before {
+                    content: "";
+                    width: 7px;
+                    height: 7px;
+                    background: #22c55e;
+                    border-radius: 50%;
+                }
                 
-                .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
-                .stat-card { background: #000000; padding: 8px 10px; border-radius: 6px; border: 1px solid #262626; text-align: left; }
-                .stat-title { font-size: 9px; color: #ffffff; text-transform: uppercase; font-weight: bold; }
-                .stat-value { font-size: 12px; font-weight: bold; color: #ffffff; margin-top: 2px; }
+                .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+                .stat-card { 
+                    background: #ffffff; 
+                    padding: 10px 12px; 
+                    border-radius: 10px; 
+                    border: 1px solid #e2e8f0; 
+                    border-left: 3px solid #3b82f6; 
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                }
+                .stat-title { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700; }
+                .stat-value { font-size: 12px; font-weight: 700; color: #0f172a; margin-top: 3px; }
                 
-                .ssh-manager { background: #000000; padding: 12px; border-radius: 10px; border: 1px solid #262626; margin-bottom: 15px; }
-                .ssh-title { font-size: 12px; font-weight: bold; color: #ffffff; text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-                .input-group { display: flex; gap: 6px; margin-bottom: 8px; }
-                .input-ssh { background: #000000; border: 1px solid #262626; padding: 6px 10px; border-radius: 6px; color: #ffffff; font-size: 12px; width: 100%; outline: none; }
-                .input-ssh:focus { border-color: #ffffff; }
+                .ssh-manager { 
+                    background: #ffffff; 
+                    padding: 16px; 
+                    border-radius: 12px; 
+                    border: 1px solid #e2e8f0; 
+                    border-top: 3px solid #0284c7; 
+                    margin-bottom: 16px; 
+                    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+                }
+                .ssh-title { font-size: 12px; font-weight: 700; color: #1e293b; text-transform: uppercase; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+                .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
+                .input-ssh { 
+                    background: #f8fafc; 
+                    border: 1px solid #cbd5e1; 
+                    padding: 8px 12px; 
+                    border-radius: 8px; 
+                    color: #0f172a; 
+                    font-size: 12px; 
+                    width: 100%; 
+                    outline: none; 
+                    transition: 0.2s;
+                }
+                .input-ssh:focus { border-color: #0284c7; background: #ffffff; box-shadow: 0 0 0 2px rgba(2,132,199,0.1); }
                 
-                .btn-add { background: #000000; color: #ffffff; border: 1px solid #262626; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; }
-                .btn-add:hover { background: #1a1a1a; }
-                .admin-status-lbl { font-size: 9px; font-weight: bold; color: #ffffff; border: 1px solid #262626; padding: 2px 5px; border-radius: 4px; }
-                .result-box { display: none; background: #000000; border: 1px solid #262626; border-radius: 6px; padding: 8px; font-family: monospace; font-size: 11px; color: #ffffff; white-wrap: pre-wrap; margin-bottom: 10px; overflow-x: hidden; }
-                .btn-copy-result { display: none; background: #000000; color: #ffffff; border: 1px solid #262626; padding: 5px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 10px; width: 100%; margin-bottom: 10px; }
-                .btn-copy-result:hover { background: #1a1a1a; }
-                .ssh-list { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
-                .ssh-list th { text-align: left; padding: 4px; color: #ffffff; border-bottom: 1px solid #262626; }
-                .ssh-list td { padding: 4px; border-bottom: 1px solid #262626; vertical-align: middle; color: #ffffff; }
-                .btn-action-group { display: flex; gap: 4px; justify-content: flex-end; }
-                .btn-del { background: #000000; color: #ffffff; border: 1px solid #262626; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 10px; display: none; }
-                .btn-del:hover { background: #1a1a1a; }
-                .btn-info { background: #000000; color: #ffffff; border: 1px solid #262626; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: bold; display: none; }
-                .btn-info:hover { background: #1a1a1a; }
+                .btn-add { 
+                    background: #0284c7; 
+                    color: #ffffff; 
+                    border: none; 
+                    padding: 8px 14px; 
+                    border-radius: 8px; 
+                    font-weight: 700; 
+                    cursor: pointer; 
+                    font-size: 11px; 
+                    transition: 0.2s;
+                }
+                .btn-add:hover { background: #0369a1; }
+                .admin-status-lbl { font-size: 9px; font-weight: 700; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 6px; border-radius: 4px; }
                 
-                .url-section { background: #000000; border: 1px solid #262626; padding: 8px 10px; border-radius: 8px; margin-bottom: 8px; }
-                .url-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-                .url-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.3px; color: #ffffff; }
-                
-                .url-content-row { display: flex; align-items: center; gap: 8px; background: #000000; border: 1px solid #262626; padding: 4px 8px; border-radius: 6px; }
-                .url-box { font-family: monospace; font-size: 11px; word-break: break-all; font-weight: bold; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ffffff; }
-                
-                .btn-copy-mini { background: #000000; color: #ffffff; border: 1px solid #262626; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; white-space: nowrap; transition: 0.2s; }
-                .btn-copy-mini:hover { background: #1a1a1a; }
+                .result-box { 
+                    display: none; 
+                    background: #f8fafc; 
+                    border: 1px solid #cbd5e1; 
+                    border-left: 3px solid #10b981; 
+                    border-radius: 8px; 
+                    padding: 10px; 
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; 
+                    font-size: 11px; 
+                    color: #0f172a; 
+                    white-space: pre-wrap; 
+                    margin-bottom: 10px; 
+                    overflow-x: hidden; 
+                }
+                .btn-copy-result { 
+                    display: none; 
+                    background: #f1f5f9; 
+                    color: #0f172a; 
+                    border: 1px solid #cbd5e1; 
+                    padding: 7px; 
+                    border-radius: 6px; 
+                    font-weight: 700; 
+                    cursor: pointer; 
+                    font-size: 11px; 
+                    width: 100%; 
+                    margin-bottom: 12px; 
+                    transition: 0.2s;
+                }
+                .btn-copy-result:hover { background: #e2e8f0; }
 
-                .select-zt-mini { background: #000000; border: none; color: #ffffff; font-size: 11px; font-weight: bold; font-family: monospace; outline: none; width: 100%; cursor: pointer; }
+                .ssh-list { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+                .ssh-list th { text-align: left; padding: 6px 8px; color: #64748b; font-weight: 700; border-bottom: 1px solid #e2e8f0; }
+                .ssh-list td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #1e293b; }
+                .btn-action-group { display: flex; gap: 6px; justify-content: flex-end; }
+                .btn-del { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; display: none; }
+                .btn-del:hover { background: #fee2e2; }
+                .btn-info { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 10px; font-weight: 600; display: none; }
+                .btn-info:hover { background: #dcfce7; }
+                
+                .url-section { 
+                    background: #ffffff; 
+                    border: 1px solid #e2e8f0; 
+                    padding: 10px 12px; 
+                    border-radius: 10px; 
+                    margin-bottom: 10px; 
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                }
+                .url-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+                .url-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: #475569; }
+                
+                .url-content-row { 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 8px; 
+                    background: #f8fafc; 
+                    border: 1px solid #cbd5e1; 
+                    padding: 6px 10px; 
+                    border-radius: 8px; 
+                }
+                .url-box { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; word-break: break-all; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #0f172a; }
+                
+                .btn-copy-mini { 
+                    background: #ffffff; 
+                    color: #334155; 
+                    border: 1px solid #cbd5e1; 
+                    padding: 4px 10px; 
+                    border-radius: 6px; 
+                    font-size: 10px; 
+                    font-weight: 700; 
+                    cursor: pointer; 
+                    white-space: nowrap; 
+                    transition: 0.2s; 
+                }
+                .btn-copy-mini:hover { background: #f1f5f9; color: #0284c7; border-color: #0284c7; }
 
-                .btn-token-trigger { width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 12px; cursor: pointer; border: 1px solid #262626; background: #000000; color: #ffffff; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
-                .btn-token-trigger:hover { background: #1a1a1a; }
+                .select-zt-mini { background: transparent; border: none; color: #0f172a; font-size: 11px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; outline: none; width: 100%; cursor: pointer; }
 
-                .card-blue { background-color: #000000; border: 1px solid #262626; padding: 12px; border-radius: 10px; margin-top: 10px; text-align: left; }
-                .btn-blue { background-color: #000000; border: 1px solid #262626; color: #ffffff; padding: 6px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; width: 100%; text-align: center; font-family: monospace; }
-                .btn-blue:hover { background-color: #1a1a1a; }
-                .btn-active { border-color: #ffffff !important; background-color: #1a1a1a !important; color: #ffffff !important; }
+                .btn-token-trigger { 
+                    width: 100%; 
+                    padding: 10px; 
+                    border-radius: 8px; 
+                    font-weight: 700; 
+                    font-size: 11px; 
+                    cursor: pointer; 
+                    border: 1px solid #e2e8f0; 
+                    background: #ffffff; 
+                    color: #0284c7; 
+                    transition: 0.2s; 
+                    text-transform: uppercase; 
+                    letter-spacing: 0.5px; 
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                }
+                .btn-token-trigger:hover { background: #f0f9ff; border-color: #bae6fd; }
+
+                .card-blue { 
+                    background-color: #ffffff; 
+                    border: 1px solid #e2e8f0; 
+                    padding: 16px; 
+                    border-radius: 12px; 
+                    margin-top: 10px; 
+                    text-align: left; 
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                }
+                .btn-blue { 
+                    background-color: #f8fafc; 
+                    border: 1px solid #cbd5e1; 
+                    color: #334155; 
+                    padding: 7px; 
+                    border-radius: 6px; 
+                    font-size: 10px; 
+                    font-weight: 700; 
+                    cursor: pointer; 
+                    width: 100%; 
+                    text-align: center; 
+                    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; 
+                    transition: 0.2s;
+                }
+                .btn-blue:hover { background-color: #f1f5f9; border-color: #94a3b8; }
+                .btn-active { border-color: #0284c7 !important; background-color: #f0f9ff !important; color: #0284c7 !important; }
                 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
-                .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
-                .lbl-vpn { font-size: 9px; color: #ffffff; font-weight: bold; display: block; margin-bottom: 3px; text-transform: uppercase; }
-                .border-lbl { border-left: 2px solid #ffffff; padding-left: 6px; font-size: 10px; font-weight: bold; margin-top: 10px; font-family: monospace; color: #ffffff; }
+                .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+                .lbl-vpn { font-size: 10px; color: #64748b; font-weight: 700; display: block; margin-bottom: 4px; text-transform: uppercase; }
+                .border-lbl { border-left: 3px solid #0284c7; padding-left: 8px; font-size: 10px; font-weight: 700; margin-top: 12px; margin-bottom: 2px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; }
 
-                .zt-admin-card { background: #000000; border: 1px solid #262626; padding: 12px; border-radius: 10px; margin-bottom: 12px; }
-                .sub-box { background: #000000; border: 1px solid #262626; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
-                .sub-box-title { font-size: 11px; font-weight: bold; color: #ffffff; margin-bottom: 6px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-                .note { font-size: 10px; color: #ffffff; text-align: center; line-height: 1.4; margin-top: 10px; }
+                .zt-admin-card { 
+                    background: #ffffff; 
+                    border: 1px solid #e2e8f0; 
+                    padding: 16px; 
+                    border-radius: 12px; 
+                    margin-bottom: 14px; 
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                }
+                .sub-box { 
+                    background: #f8fafc; 
+                    border: 1px solid #e2e8f0; 
+                    padding: 12px; 
+                    border-radius: 10px; 
+                    margin-bottom: 12px; 
+                }
+                .sub-box-title { font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 8px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+                .note { font-size: 10px; color: #94a3b8; text-align: center; line-height: 1.5; margin-top: 14px; }
             </style>
         </head>
         <body>
@@ -863,8 +1118,8 @@ const server = http.createServer(async (req, res) => {
                     <li class="menu-item" onclick="switchPage('page-set-cfip')">Pengaturan CFIP</li>
                     <li class="menu-item" onclick="switchPage('page-generator')">Config Generator</li>
                 </ul>
-                <div style="padding: 15px 20px; border-top: 1px solid #262626;">
-                    <span id="btn-change-pass" onclick="changeAdminPassUI()" style="color: #ffffff; cursor: pointer; font-size: 11px; text-decoration: underline; display: none;">GANTI PASS ADMIN</span>
+                <div style="padding: 15px 20px; border-top: 1px solid #f1f5f9;">
+                    <span id="btn-change-pass" onclick="changeAdminPassUI()" style="color: #0284c7; cursor: pointer; font-size: 11px; font-weight: 600; text-decoration: underline; display: none;">GANTI PASS ADMIN</span>
                 </div>
             </div>
 
@@ -873,15 +1128,15 @@ const server = http.createServer(async (req, res) => {
                     
                     <!-- 🏠 HALAMAN 1: DASHBOARD UTAMA -->
                     <div id="page-dashboard" class="page-section active">
-                        <div style="text-align:center; margin-bottom: 10px;">
-                            <h1 style="font-size:16px; color:#ffffff; text-transform:uppercase;">DASHBOARD SERVER</h1>
+                        <div style="text-align:center; margin-bottom: 12px;">
+                            <h1 style="font-size:16px; color:#0f172a; text-transform:uppercase; font-weight:800;">DASHBOARD SERVER</h1>
                             <div class="dev-tag">DYNAMIC TRIPLE-TUNNEL NODE CORE ACTIVE</div>
                         </div>
 
-                        <div class="status-container"><div class="status-badge"><span style="color: #ffffff">ALL TUNNELS ONLINE</span></div></div>
+                        <div class="status-container"><div class="status-badge"><span>ALL TUNNELS ONLINE</span></div></div>
                         
                         <div class="stats-grid">
-                            <div class="stat-card" style="grid-column: span 2;"><div class="stat-title">CPU Model</div><div class="stat-value" id="cpu" style="font-size:11px; color:#ffffff;">Loading...</div></div>
+                            <div class="stat-card" style="grid-column: span 2;"><div class="stat-title">CPU Model</div><div class="stat-value" id="cpu" style="font-size:11px; color:#1e293b;">Loading...</div></div>
                             <div class="stat-card"><div class="stat-title">RAM Used / Total</div><div class="stat-value" id="ram">Loading...</div></div>
                             <div class="stat-card"><div class="stat-title">Disk Usage (/)</div><div class="stat-value" id="disk">Loading...</div></div>
                             <div class="stat-card"><div class="stat-title">Server Uptime</div><div class="stat-value" id="uptime" style="font-size:11px;">Loading...</div></div>
@@ -894,14 +1149,14 @@ const server = http.createServer(async (req, res) => {
 
                         <div class="sub-box" style="margin-bottom: 12px;">
                             <div class="sub-box-title" style="text-align:center; display:block;">INFO PENGATURAN SERVER</div>
-                            <div style="font-size: 10px; color: #ffffff; text-align: center; font-weight: bold; line-height: 1.5;">
-                                <span>CFIP: </span><span id="display-cfip" style="font-family:monospace;">Loading...</span> | 
-                                <span>DNS: </span><span id="display-dns" style="font-family:monospace;">UDP</span> | 
-                                <span>ENGINE: </span><span id="display-engine" style="font-family:monospace;">WS</span><br>
-                                <span>PORT: </span><span id="display-ws-port" style="font-family:monospace;">22</span> | 
-                                <span>KEEPALIVE: </span><span id="display-ws-keep" style="font-family:monospace;">15000ms</span> | 
-                                <span>BBR: </span><span id="display-bbr" style="font-family:monospace;">ON</span> | 
-                                <span>UDPGW: </span><span id="display-udpgw" style="font-family:monospace;">7300</span>
+                            <div style="font-size: 11px; color: #475569; text-align: center; font-weight: 600; line-height: 1.6;">
+                                <span>CFIP: </span><span id="display-cfip" style="font-family:ui-monospace, monospace; color:#0f172a;">Loading...</span> | 
+                                <span>DNS: </span><span id="display-dns" style="font-family:ui-monospace, monospace; color:#0f172a;">UDP</span> | 
+                                <span>ENGINE: </span><span id="display-engine" style="font-family:ui-monospace, monospace; color:#0f172a;">WS</span><br>
+                                <span>PORT: </span><span id="display-ws-port" style="font-family:ui-monospace, monospace; color:#0f172a;">22</span> | 
+                                <span>KEEPALIVE: </span><span id="display-ws-keep" style="font-family:ui-monospace, monospace; color:#0f172a;">15000ms</span> | 
+                                <span>BBR: </span><span id="display-bbr" style="font-family:ui-monospace, monospace; color:#0f172a;">ON</span> | 
+                                <span>UDPGW: </span><span id="display-udpgw" style="font-family:ui-monospace, monospace; color:#0f172a;">7300</span>
                             </div>
                         </div>
 
@@ -962,12 +1217,12 @@ const server = http.createServer(async (req, res) => {
                             </div>
                             <div id="ssh-result" class="result-box"></div>
                             <button id="btn-copy-acc" class="btn-copy-result" onclick="copyAccountText()">COPY DETAIL AKUN</button>
-                            <div id="ssh-msg" style="font-size: 11px; margin-top: 5px; font-weight: bold; color: #ffffff;"></div>
+                            <div id="ssh-msg" style="font-size: 11px; margin-top: 5px; font-weight: bold; color: #dc2626;"></div>
                             
-                            <div class="ssh-title" style="margin-top: 15px; border-top: 1px solid #262626; padding-top: 10px;">DAFTAR AKUN TERDAFTAR</div>
+                            <div class="ssh-title" style="margin-top: 15px; border-top: 1px solid #f1f5f9; padding-top: 10px;">DAFTAR AKUN TERDAFTAR</div>
                             <table class="ssh-list">
                                 <thead><tr><th>Username</th><th>Shell Path</th><th style="text-align: right;">Aksi</th></tr></thead>
-                                <tbody id="ssh-table-body"><tr><td colspan="3" style="text-align:center; color:#ffffff;">Loading accounts...</td></tr></tbody>
+                                <tbody id="ssh-table-body"><tr><td colspan="3" style="text-align:center; color:#94a3b8;">Loading accounts...</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -1011,10 +1266,10 @@ const server = http.createServer(async (req, res) => {
                                     </div>
                                 </div>
 
-                                <div style="margin-top:10px; border-top:1px solid #262626; padding-top:8px;">
+                                <div style="margin-top:10px; border-top:1px solid #e2e8f0; padding-top:8px;">
                                     <div>
                                         <label class="lbl-vpn">BANNER DROPBEAR</label>
-                                        <textarea id="bannerInput" class="input-ssh" style="height:50px; font-family:monospace; font-size:10px;" placeholder="Kosongkan untuk banner standar..."></textarea>
+                                        <textarea id="bannerInput" class="input-ssh" style="height:50px; font-family:ui-monospace, monospace; font-size:10px;" placeholder="Kosongkan untuk banner standar..."></textarea>
                                     </div>
 
                                     <div class="grid-2" style="margin-top:6px; margin-bottom:0;">
@@ -1090,7 +1345,7 @@ const server = http.createServer(async (req, res) => {
                         <div class="zt-admin-card">
                             <div class="sub-box" style="margin-bottom:0;">
                                 <div class="sub-box-title">CLOUDFLARE CLEAN IP (CFIP)</div>
-                                <p style="font-size: 10px; color: #ffffff; margin-bottom: 10px; line-height: 1.4;">Atur IP Cloudflare yang bersih untuk kestabilan koneksi.</p>
+                                <p style="font-size: 11px; color: #64748b; margin-bottom: 10px; line-height: 1.5;">Atur IP Cloudflare yang bersih untuk kestabilan koneksi.</p>
                                 <button class="btn-token-trigger" style="padding:10px;" onclick="promptCfipInput()">UBAH / RESET CFIP</button>
                             </div>
                         </div>
@@ -1099,31 +1354,31 @@ const server = http.createServer(async (req, res) => {
                     <!-- ⚡ HALAMAN 6: CONFIG GENERATOR -->
                     <div id="page-generator" class="page-section">
                         <div class="card-blue" style="margin-top:0;">
-                          <div style="text-align: center; margin-bottom: 10px; border-bottom: 1px solid #262626; padding-bottom: 6px;">
-                            <span style="font-size: 12px; font-weight: bold; color: #ffffff;">CONFIG GENERATOR</span>
+                          <div style="text-align: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                            <span style="font-size: 12px; font-weight: 700; color: #0f172a;">CONFIG GENERATOR</span>
                           </div>
                           <div class="grid-2">
                             <div>
                               <label class="lbl-vpn">UUID / PASS</label>
-                              <input id="uuidInput" type="text" value="Loading..." class="input-ssh" style="font-family: monospace;" readonly>
+                              <input id="uuidInput" type="text" value="Loading..." class="input-ssh" style="font-family: ui-monospace, monospace;" readonly>
                             </div>
                             <div>
                               <label class="lbl-vpn">TARGET DOMAIN</label>
-                              <select id="domainSelect" class="input-ssh" style="font-family: monospace; font-weight: bold;">
+                              <select id="domainSelect" class="input-ssh" style="font-family: ui-monospace, monospace; font-weight: bold;">
                                 <option value="">-- Menunggu Domain --</option>
                               </select>
                             </div>
                           </div>
                           <div style="margin-bottom: 10px;">
                             <label class="lbl-vpn">BUG HOST (SNI / CDN)</label>
-                            <input id="bugInput" type="text" value="v.whatsapp.net" class="input-ssh" style="font-family: monospace;">
+                            <input id="bugInput" type="text" value="v.whatsapp.net" class="input-ssh" style="font-family: ui-monospace, monospace;">
                           </div>
 
-                          <div class="border-lbl" style="color: #00ff88; border-color: #00ff88;">REALITY / RAILWAY</div>
+                          <div class="border-lbl" style="color: #059669; border-color: #059669;">REALITY / RAILWAY</div>
                           <div class="grid-3">
-                            <button onclick="buildRealityConfig('vless', event)" class="btn-blue" style="border-color:#00ff88;">VLESS REALITY</button>
-                            <button onclick="buildRealityConfig('vmess', event)" class="btn-blue" style="border-color:#00ff88;">VMESS REALITY</button>
-                            <button onclick="buildRealityConfig('trojan', event)" class="btn-blue" style="border-color:#00ff88;">TROJAN REALITY</button>
+                            <button onclick="buildRealityConfig('vless', event)" class="btn-blue" style="border-color:#a7f3d0; background-color:#ecfdf5; color:#047857;">VLESS REALITY</button>
+                            <button onclick="buildRealityConfig('vmess', event)" class="btn-blue" style="border-color:#a7f3d0; background-color:#ecfdf5; color:#047857;">VMESS REALITY</button>
+                            <button onclick="buildRealityConfig('trojan', event)" class="btn-blue" style="border-color:#a7f3d0; background-color:#ecfdf5; color:#047857;">TROJAN REALITY</button>
                           </div>
 
                           <div class="border-lbl">BUG SNI (NORMAL)</div>
@@ -1147,12 +1402,12 @@ const server = http.createServer(async (req, res) => {
                             <button onclick="buildConfig('trojan', 'cdn', event)" class="btn-blue">TROJAN</button>
                           </div>
 
-                          <div id="output-area" class="result-box" style="margin-top: 10px; display: none;">
-                            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; font-size: 10px;">
-                              <span id="out-type">CONFIG</span>
-                              <span onclick="copyOutConfig()" style="cursor: pointer; text-decoration: underline;">[COPY]</span>
+                          <div id="output-area" class="result-box" style="margin-top: 12px; display: none;">
+                            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 6px; font-size: 11px;">
+                              <span id="out-type" style="color: #0284c7;">CONFIG</span>
+                              <span onclick="copyOutConfig()" style="cursor: pointer; text-decoration: underline; color: #0284c7;">[COPY]</span>
                             </div>
-                            <p id="configText" style="word-break: break-all; color: #ffffff; max-height: 120px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;"></p>
+                            <p id="configText" style="word-break: break-all; color: #0f172a; max-height: 120px; overflow-y: auto; font-family: ui-monospace, monospace; white-space: pre-wrap;"></p>
                           </div>
                         </div>
                     </div>
@@ -1195,16 +1450,16 @@ const server = http.createServer(async (req, res) => {
 
                     if(!isPassConfigured) {
                         loginBtn.innerText = "SETUP PASS";
-                        loginBtn.style.background = "#000000"; loginBtn.style.color = "#ffffff";
+                        loginBtn.style.background = "#f8fafc"; loginBtn.style.color = "#334155";
                         if(changePassBtn) changePassBtn.style.display = "none";
                     } else if(adminToken) {
-                        if(indicator) { indicator.innerText = "ADMIN ROUTE"; indicator.style.color = "#ffffff"; indicator.style.background = "#000000"; }
-                        loginBtn.innerText = "LOGOUT"; loginBtn.style.background = "#000000"; loginBtn.style.color = "#ffffff";
+                        if(indicator) { indicator.innerText = "ADMIN ROUTE"; indicator.style.color = "#0284c7"; indicator.style.background = "#f0f9ff"; }
+                        loginBtn.innerText = "LOGOUT"; loginBtn.style.background = "#fef2f2"; loginBtn.style.color = "#dc2626";
                         if(changePassBtn) changePassBtn.style.display = "inline";
                         document.querySelectorAll('.btn-del').forEach(b => b.style.display = "inline-block"); document.querySelectorAll('.btn-info').forEach(b => b.style.display = "inline-block");
                     } else {
-                        if(indicator) { indicator.innerText = "PUBLIC CREATION"; indicator.style.color = "#ffffff"; indicator.style.background = "#000000"; }
-                        loginBtn.innerText = "LOGIN ADMIN"; loginBtn.style.background = "#000000"; loginBtn.style.color = "#ffffff";
+                        if(indicator) { indicator.innerText = "PUBLIC CREATION"; indicator.style.color = "#475569"; indicator.style.background = "#f1f5f9"; }
+                        loginBtn.innerText = "LOGIN ADMIN"; loginBtn.style.background = "#f8fafc"; loginBtn.style.color = "#334155";
                         if(changePassBtn) changePassBtn.style.display = "none";
                         document.querySelectorAll('.btn-del').forEach(b => b.style.display = "none"); document.querySelectorAll('.btn-info').forEach(b => b.style.display = "none");
                     }
@@ -1395,7 +1650,7 @@ const server = http.createServer(async (req, res) => {
                         document.getElementById('disk').innerText = data.disk_usage || "0%"; 
                         document.getElementById('uptime').innerText = data.uptime || "0 Hours";
                         let detailActiveList = data.user_list_details || "Semua user offline";
-                        document.getElementById('ssh').innerHTML = (data.ssh_online || "0") + " Active<br><span style='font-size:9px; font-weight:normal; color:#ffffff; display:block; margin-top:2px; white-space:pre-line;'>" + detailActiveList + "</span>";
+                        document.getElementById('ssh').innerHTML = (data.ssh_online || "0") + " Active<br><span style='font-size:9px; font-weight:normal; color:#64748b; display:block; margin-top:2px; white-space:pre-line;'>" + detailActiveList + "</span>";
                         document.getElementById('display-cfip').innerText = data.active_cfip || "Default";
 
                         if(data.dns_type) {
@@ -1509,19 +1764,19 @@ const server = http.createServer(async (req, res) => {
                         if(data.status === "success" && data.users.length > 0) {
                             savedUsersData = data.users; 
                             data.users.forEach(u => {
-                                tbody.innerHTML += '<tr><td style="font-weight:bold; color:#ffffff;">'+u.username+'</td><td style="color:#ffffff;">'+u.shell+'</td><td style="text-align: right;"><div class="btn-action-group"><button class="btn-info" onclick="showAccountDetails(\\''+u.username+'\\')">INFO</button><button class="btn-del" onclick="deleteAccount(\\''+u.username+'\\')">HAPUS</button></div></td></tr>';
+                                tbody.innerHTML += '<tr><td style="font-weight:bold; color:#0f172a;">'+u.username+'</td><td style="color:#475569;">'+u.shell+'</td><td style="text-align: right;"><div class="btn-action-group"><button class="btn-info" onclick="showAccountDetails(\\''+u.username+'\\')">INFO</button><button class="btn-del" onclick="deleteAccount(\\''+u.username+'\\')">HAPUS</button></div></td></tr>';
                             });
                             checkAdminUI();
-                        } else { tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#ffffff;">Belum ada akun SSH kustom</td></tr>'; }
+                        } else { tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Belum ada akun SSH kustom</td></tr>'; }
                     } catch(e) {}
                 }
                 function showAccountDetails(username) { let userObj = savedUsersData.find(u => u.username === username); if(userObj) { alert("DATA AKUN:\\n===============================\\nUsername   : " + userObj.username + "\\nPassword   : " + userObj.password + "\\nIP Address : " + userObj.ip); } }
                 async function createAccount() {
                     let user = document.getElementById('ssh-user').value.trim(); let pass = document.getElementById('ssh-pass').value.trim(); let msg = document.getElementById('ssh-msg'); let resBox = document.getElementById('ssh-result'); let copyBtn = document.getElementById('btn-copy-acc');
-                    if(!user || !pass) { msg.style.color = "#ffffff"; msg.innerText = "Isi username & password!"; return; }
+                    if(!user || !pass) { msg.style.color = "#dc2626"; msg.innerText = "Isi username & password!"; return; }
                     try {
                         let res = await fetch('/api/add?user='+user+'&pass='+pass); let data = await res.json();
-                        if(data.status === "success") { msg.innerText = ""; resBox.innerText = data.message; resBox.style.display = "block"; copyBtn.style.display = "block"; document.getElementById('ssh-user').value = ""; document.getElementById('ssh-pass').value = ""; fetchAccounts(); } else { msg.style.color = "#ffffff"; msg.innerText = data.message; resBox.style.display = "none"; copyBtn.style.display = "none"; }
+                        if(data.status === "success") { msg.innerText = ""; resBox.innerText = data.message; resBox.style.display = "block"; copyBtn.style.display = "block"; document.getElementById('ssh-user').value = ""; document.getElementById('ssh-pass').value = ""; fetchAccounts(); } else { msg.style.color = "#dc2626"; msg.innerText = data.message; resBox.style.display = "none"; copyBtn.style.display = "none"; }
                     } catch(e) { msg.innerText = "Gagal memproses API"; }
                 }
                 function copyAccountText() { let txt = document.getElementById('ssh-result').innerText; navigator.clipboard.writeText(txt); let btn = document.getElementById('btn-copy-acc'); btn.innerText = "COPIED!"; setTimeout(() => { btn.innerText = "COPY DETAIL AKUN"; }, 1500); }
@@ -1542,8 +1797,8 @@ const server = http.createServer(async (req, res) => {
                     
                     if(!urlText.includes("Menunggu") && !urlText.includes("Tidak Aktif")) {
                         navigator.clipboard.writeText(urlText); let btn = document.getElementById(btnId);
-                        btn.innerText = "Done"; btn.style.background = "#1a1a1a"; btn.style.color = "#ffffff";
-                        setTimeout(() => { btn.innerText = "Copy"; btn.style.background = "#000000"; btn.style.color = "#ffffff"; }, 1500);
+                        btn.innerText = "Done"; btn.style.background = "#e2e8f0"; btn.style.color = "#0284c7";
+                        setTimeout(() => { btn.innerText = "Copy"; btn.style.background = "#ffffff"; btn.style.color = "#334155"; }, 1500);
                     }
                 }
 
