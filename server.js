@@ -391,17 +391,28 @@ async function generateConfig() {
 
   if (netSettings.dns_type === 'doh') {
     if (!dnsValue.startsWith('http')) dnsValue = 'https://1.1.1.1/dns-query';
-    dnsServers = [dnsValue, "8.8.8.8"];
+    dnsServers = [dnsValue, "https://dns.google/dns-query", "8.8.8.8", "2606:4700:4700::1111", "2001:4860:4860::8888"];
   } else {
     if (!dnsValue || dnsValue.startsWith('http')) dnsValue = '8.8.8.8';
-    dnsServers = [dnsValue, "1.1.1.1"];
+    dnsServers = [dnsValue, "1.1.1.1", "2606:4700:4700::1111", "2001:4860:4860::8888"];
   }
 
   const config = { 
     log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' }, 
     inbounds: inboundsList, 
-    dns: { servers: dnsServers }, 
-    outbounds: [{ protocol: "freedom", tag: "direct" }] 
+    dns: { 
+      servers: dnsServers,
+      queryStrategy: "UseIPv6v4"
+    }, 
+    outbounds: [
+      { 
+        protocol: "freedom", 
+        tag: "direct",
+        settings: {
+          domainStrategy: "UseIPv6v4"
+        }
+      }
+    ] 
   };
   
   fs.writeFileSync(path.join(FILE_PATH, 'config.json'), JSON.stringify(config, null, 2));
