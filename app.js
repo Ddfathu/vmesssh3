@@ -370,7 +370,7 @@ async function updateStats() {
         document.getElementById('quick-url').innerText = data.quick_url || "Menunggu Quick Tunnel...";
 
         // ========================================================
-        // POPULASI DROPDOWN GENERATOR DOMAIN (AUTO-DETECT WOKKU)
+        // POPULASI DROPDOWN GENERATOR DOMAIN (AUTO-DETECT URL)
         // ========================================================
         let currentHostDomain = window.location.hostname;
         let domainSelect = document.getElementById('domainSelect');
@@ -378,7 +378,7 @@ async function updateStats() {
         let optionsHtml = '';
 
         if (currentHostDomain) {
-            optionsHtml += '<option value="' + currentHostDomain + '">Domain Utama (Wokku): ' + currentHostDomain + '</option>';
+            optionsHtml += '<option value="' + currentHostDomain + '">Domain dari url: ' + currentHostDomain + '</option>';
         }
 
         if (railwayDomainStored) {
