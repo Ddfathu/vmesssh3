@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>SSH & VPN PANEL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+            <div class="nav-title">SERVER PANEL</div>
+        </div>
+        <button class="btn-login-trigger" id="admin-login-btn" onclick="handleAdminAuthBtn()">LOGIN ADMIN</button>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">MENU NAVIGATION</div>
+            <button class="close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="menu-item active" onclick="switchPage('page-dashboard', event)">Dashboard Utama</li>
+            <li class="menu-item" onclick="switchPage('page-buat-ssh', event)">Buat Akun SSH</li>
+            <li class="menu-item" onclick="switchPage('page-set-ssh', event)">Pengaturan SSH</li>
+            <li class="menu-item" onclick="switchPage('page-set-v2ray', event)">Pengaturan V2Ray / VMess</li>
+            <li class="menu-item" onclick="switchPage('page-set-cfip', event)">Pengaturan CFIP</li>
+            <li class="menu-item" onclick="switchPage('page-generator', event)">Config Generator</li>
+        </ul>
+        <div style="padding: 15px 20px; border-top: 1px solid #f1f5f9;">
+            <span id="btn-change-pass" onclick="changeAdminPassUI()" style="color: #0284c7; cursor: pointer; font-size: 11px; font-weight: 600; text-decoration: underline; display: none;">GANTI PASS ADMIN</span>
+        </div>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="container">
+            
+            <!-- 🏠 HALAMAN 1: DASHBOARD UTAMA -->
+            <div id="page-dashboard" class="page-section active">
+                <div style="text-align:center; margin-bottom: 12px;">
+                    <h1 style="font-size:16px; color:#0f172a; text-transform:uppercase; font-weight:800;">DASHBOARD SERVER</h1>
+                    <div class="dev-tag">DYNAMIC TRIPLE-TUNNEL NODE CORE ACTIVE</div>
+                </div>
+
+                <div class="status-container"><div class="status-badge"><span>ALL TUNNELS ONLINE</span></div></div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card" style="grid-column: span 2;"><div class="stat-title">CPU Model</div><div class="stat-value" id="cpu" style="font-size:11px; color:#1e293b;">Loading...</div></div>
+                    <div class="stat-card"><div class="stat-title">RAM Used / Total</div><div class="stat-value" id="ram">Loading...</div></div>
+                    <div class="stat-card"><div class="stat-title">Disk Usage (/)</div><div class="stat-value" id="disk">Loading...</div></div>
+                    <div class="stat-card"><div class="stat-title">Server Uptime</div><div class="stat-value" id="uptime" style="font-size:11px;">Loading...</div></div>
+                    <div class="stat-card"><div class="stat-title">SSH Online</div><div class="stat-value" id="ssh" style="font-size:12px; line-height:1.2;">0 Users</div></div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <button class="btn-token-trigger" onclick="promptSingleTokenInput()">MASUKKAN TOKEN ARGO TUNNEL</button>
+                </div>
+
+                <div class="sub-box" style="margin-bottom: 12px;">
+                    <div class="sub-box-title" style="text-align:center; display:block;">INFO PENGATURAN SERVER</div>
+                    <div style="font-size: 11px; color: #475569; text-align: center; font-weight: 600; line-height: 1.6;">
+                        <span>CFIP: </span><span id="display-cfip" style="font-family:ui-monospace, monospace; color:#0f172a;">Loading...</span> | 
+                        <span>DNS: </span><span id="display-dns" style="font-family:ui-monospace, monospace; color:#0f172a;">UDP</span> | 
+                        <span>ENGINE: </span><span id="display-engine" style="font-family:ui-monospace, monospace; color:#0f172a;">WS</span><br>
+                        <span>PORT: </span><span id="display-ws-port" style="font-family:ui-monospace, monospace; color:#0f172a;">22</span> | 
+                        <span>KEEPALIVE: </span><span id="display-ws-keep" style="font-family:ui-monospace, monospace; color:#0f172a;">15000ms</span> | 
+                        <span>BBR: </span><span id="display-bbr" style="font-family:ui-monospace, monospace; color:#0f172a;">ON</span> | 
+                        <span>UDPGW: </span><span id="display-udpgw" style="font-family:ui-monospace, monospace; color:#0f172a;">7300</span>
+                    </div>
+                </div>
+
+                <!-- 1. REALITY SERVER (RAILWAY PUBLIC DOMAIN) -->
+                <div class="url-section">
+                    <div class="url-header"><span class="url-title">server vles vmes trojan REALITY</span></div>
+                    <div class="url-content-row">
+                        <div class="url-box" id="railway-url">Loading Railway Domain...</div>
+                        <button class="btn-copy-mini" id="btn-copy-railway" onclick="copyTxt('railway-url', 'btn-copy-railway')">Copy</button>
+                    </div>
+                </div>
+
+                <!-- 2. SSH SNI SERVER (RAILWAY TCP PROXY / SNI) -->
+                <div class="url-section">
+                    <div class="url-header"><span class="url-title">SSH SNI Server</span></div>
+                    <div class="url-content-row">
+                        <div class="url-box" id="sni-url">Loading...</div>
+                        <button class="btn-copy-mini" id="btn-copy-sni" onclick="copyTxt('sni-url', 'btn-copy-sni')">Copy</button>
+                    </div>
+                </div>
+
+                <!-- 3. SSH WS DOMAIN -->
+                <div class="url-section">
+                    <div class="url-header"><span class="url-title">SSH WS Domain</span></div>
+                    <div class="url-content-row">
+                        <div id="zt-container" style="flex:1; overflow:hidden;"><div class="url-box" id="named-url">Menghubungkan...</div></div>
+                        <button class="btn-copy-mini" id="btn-copy-named" onclick="copyTxt('named-url', 'btn-copy-named')">Copy</button>
+                    </div>
+                </div>
+
+                <!-- 4. VMESS / VLESS DOMAIN -->
+                <div class="url-section">
+                    <div class="url-header"><span class="url-title">VMess / VLess Domain</span></div>
+                    <div class="url-content-row">
+                        <div id="zt-vmess-container" style="flex:1; overflow:hidden;"><div class="url-box" id="vmess-named-url">Menghubungkan...</div></div>
+                        <button class="btn-copy-mini" id="btn-copy-vmess-named" onclick="copyTxt('vmess-named-url', 'btn-copy-vmess-named')">Copy</button>
+                    </div>
+                </div>
+
+                <!-- 5. QUICK TUNNEL SUB -->
+                <div class="url-section">
+                    <div class="url-header"><span class="url-title">Quick Tunnel Sub</span></div>
+                    <div class="url-content-row">
+                        <div class="url-box" id="quick-url">Loading...</div>
+                        <button class="btn-copy-mini" id="btn-copy-quick" onclick="copyTxt('quick-url', 'btn-copy-quick')">Copy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ➕ HALAMAN 2: BUAT AKUN SSH -->
+            <div id="page-buat-ssh" class="page-section">
+                <div class="ssh-manager">
+                    <div class="ssh-title"><span>BUAT AKUN SSH BARU</span><span id="admin-indicator" class="admin-status-lbl">PUBLIC CREATION</span></div>
+                    <div class="input-group">
+                        <input type="text" id="ssh-user" class="input-ssh" placeholder="Username...">
+                        <input type="password" id="ssh-pass" class="input-ssh" placeholder="Password...">
+                        <button class="btn-add" id="btn-add-ssh" onclick="createAccount()">ADD</button>
+                    </div>
+                    <div id="ssh-result" class="result-box"></div>
+                    <button id="btn-copy-acc" class="btn-copy-result" onclick="copyAccountText()">COPY DETAIL AKUN</button>
+                    <div id="ssh-msg" style="font-size: 11px; margin-top: 5px; font-weight: bold; color: #dc2626;"></div>
+                    
+                    <div class="ssh-title" style="margin-top: 15px; border-top: 1px solid #f1f5f9; padding-top: 10px;">DAFTAR AKUN TERDAFTAR</div>
+                    <table class="ssh-list">
+                        <thead><tr><th>Username</th><th>Shell Path</th><th style="text-align: right;">Aksi</th></tr></thead>
+                        <tbody id="ssh-table-body"><tr><td colspan="3" style="text-align:center; color:#94a3b8;">Loading accounts...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 🔌 HALAMAN 3: SETTING SSH SERVER -->
+            <div id="page-set-ssh" class="page-section">
+                <div class="zt-admin-card">
+                    <div class="sub-box" style="margin-bottom:0;">
+                        <div class="sub-box-title">PENGATURAN SSH SERVER</div>
+                        <div class="grid-3" style="margin-top:4px;">
+                            <div>
+                                <label class="lbl-vpn">PORT DROPBEAR</label>
+                                <select id="wsPortDropdown" class="input-ssh" onchange="toggleCustomWsPortInput()">
+                                    <option value="22">Port 22 (OpenSSH)</option>
+                                    <option value="109">Port 109 (Dropbear Direct)</option>
+                                    <option value="143">Port 143 (Dropbear Alt)</option>
+                                    <option value="447">Port 447 (SSL Stunnel)</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                                <input type="number" id="wsPortInput" class="input-ssh" placeholder="Port..." style="display:none; margin-top:4px;">
+                            </div>
+                            <div>
+                                <label class="lbl-vpn">KEEPALIVE</label>
+                                <select id="wsKeepDropdown" class="input-ssh" onchange="toggleCustomWsKeepInput()">
+                                    <option value="5000">5000 (5s)</option>
+                                    <option value="15000">15000 (15s)</option>
+                                    <option value="30000">30000 (30s)</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                                <input type="number" id="wsKeepInput" class="input-ssh" placeholder="MS..." style="display:none; margin-top:4px;">
+                            </div>
+                            <div>
+                                <label class="lbl-vpn">MAX BUFFER</label>
+                                <select id="wsBufDropdown" class="input-ssh" onchange="toggleCustomWsBufInput()">
+                                    <option value="16384">16384 (16KB)</option>
+                                    <option value="32768">32768 (32KB)</option>
+                                    <option value="65536">65536 (64KB)</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                                <input type="number" id="wsBufInput" class="input-ssh" placeholder="Bytes..." style="display:none; margin-top:4px;">
+                            </div>
+                        </div>
+
+                        <div style="margin-top:10px; border-top:1px solid #e2e8f0; padding-top:8px;">
+                            <div>
+                                <label class="lbl-vpn">BANNER DROPBEAR</label>
+                                <textarea id="bannerInput" class="input-ssh" style="height:50px; font-family:ui-monospace, monospace; font-size:10px;" placeholder="Kosongkan untuk banner standar..."></textarea>
+                            </div>
+
+                            <div class="grid-2" style="margin-top:6px; margin-bottom:0;">
+                                <div>
+                                    <label class="lbl-vpn">TCP BBR</label>
+                                    <select id="bbrSelect" class="input-ssh" style="font-weight:bold;">
+                                        <option value="true">ON</option>
+                                        <option value="false">OFF</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="lbl-vpn">UDPGW PORT</label>
+                                    <select id="udpgwPortSelect" class="input-ssh" style="font-weight:bold;">
+                                        <option value="7300">Port 7300</option>
+                                        <option value="7200">Port 7200</option>
+                                        <option value="7100">Port 7100</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn-token-trigger" style="margin-top:8px; padding:8px;" onclick="saveWsProxySettingUI()">SIMPAN SSH CONFIG</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⚙️ HALAMAN 4: SETTING V2RAY SERVER -->
+            <div id="page-set-v2ray" class="page-section">
+                <div class="zt-admin-card">
+                    <div class="sub-box" style="margin-bottom:0;">
+                        <div class="sub-box-title">PENGATURAN V2RAY SERVER</div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div class="grid-2" style="margin-bottom:0;">
+                                <div>
+                                    <label class="lbl-vpn">DNS MODE</label>
+                                    <select id="dnsTypeSelect" class="input-ssh" style="font-weight: bold;" onchange="toggleDnsPlaceholder()">
+                                        <option value="udp">UDP Fast DNS</option>
+                                        <option value="doh">DoH Secure DNS</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="lbl-vpn">ENGINE MODE</label>
+                                    <select id="engineSelect" class="input-ssh" style="font-weight: bold;">
+                                        <option value="ws">WebSocket (WS)</option>
+                                        <option value="grpc">gRPC Engine</option>
+                                        <option value="h2">HTTP/2 (H2)</option>
+                                        <option value="tcp">TCP Direct</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="lbl-vpn">CUSTOM DNS IP / DOH URL</label>
+                                <select id="dnsDropdown" class="input-ssh" onchange="toggleCustomDnsInput()">
+                                    <option value="8.8.8.8">Google DNS (8.8.8.8)</option>
+                                    <option value="1.1.1.1">Cloudflare DNS (1.1.1.1)</option>
+                                    <option value="9.9.9.9">Quad9 DNS (9.9.9.9)</option>
+                                    <option value="https://1.1.1.1/dns-query">Cloudflare DoH</option>
+                                    <option value="https://dns.google/dns-query">Google DoH</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                                <input type="text" id="customDnsInput" class="input-ssh" placeholder="Ketik DNS Manual..." style="display:none; margin-top:4px;">
+                            </div>
+
+                            <button class="btn-token-trigger" style="margin-top: 4px; padding:8px;" onclick="saveDnsNetworkSetting()">SIMPAN V2RAY CONFIG</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🚀 HALAMAN 5: SETTING CFIP -->
+            <div id="page-set-cfip" class="page-section">
+                <div class="zt-admin-card">
+                    <div class="sub-box" style="margin-bottom:0;">
+                        <div class="sub-box-title">CLOUDFLARE CLEAN IP (CFIP)</div>
+                        <p style="font-size: 11px; color: #64748b; margin-bottom: 10px; line-height: 1.5;">Atur IP Cloudflare yang bersih untuk kestabilan koneksi.</p>
+                        <button class="btn-token-trigger" style="padding:10px;" onclick="promptCfipInput()">UBAH / RESET CFIP</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⚡ HALAMAN 6: CONFIG GENERATOR -->
+            <div id="page-generator" class="page-section">
+                <div class="card-blue" style="margin-top:0;">
+                  <div style="text-align: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                    <span style="font-size: 12px; font-weight: 700; color: #0f172a;">CONFIG GENERATOR</span>
+                  </div>
+                  
+                  <div class="grid-2">
+                    <div>
+                      <label class="lbl-vpn">UUID / PASS</label>
+                      <input id="uuidInput" type="text" value="Loading..." class="input-ssh" style="font-family: ui-monospace, monospace;" readonly>
+                    </div>
+                    <div>
+                      <label class="lbl-vpn">TARGET DOMAIN</label>
+                      <select id="domainSelect" class="input-ssh" style="font-family: ui-monospace, monospace; font-weight: bold;">
+                        <option value="">-- Menunggu Domain --</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- 🔹 FITUR BARU: PILIHAN PORT 443 DAN 80 -->
+                  <div class="grid-2">
+                    <div>
+                      <label class="lbl-vpn">BUG HOST (SNI / CDN)</label>
+                      <input id="bugInput" type="text" value="v.whatsapp.net" class="input-ssh" style="font-family: ui-monospace, monospace;">
+                    </div>
+                    <div>
+                      <label class="lbl-vpn">PORT TARGET</label>
+                      <select id="portSelect" class="input-ssh" style="font-family: ui-monospace, monospace; font-weight: bold;">
+                        <option value="443">Port 443 (TLS + Auto FP)</option>
+                        <option value="80">Port 80 (NTLS / Direct)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="border-lbl" style="color: #059669; border-color: #059669;">REALITY / RAILWAY</div>
+                  <div class="grid-3">
+                    <button onclick="buildRealityConfig('vless', event)" class="btn-blue" style="border-color:#a7f3d0; background-color:#ecfdf5; color:#047857;">VLESS REALITY</button>
+                    <button onclick="buildRealityConfig('vmess', event)" class="btn-blue" style="border-color:#a7f3d0; background-color:#ecfdf5; color:#047857;">VMESS REALITY</button>
+                    <button onclick="buildRealityConfig('trojan', event)" class="btn-blue" style="border-color:#a7f3d0; background-color:#ecfdf5; color:#047857;">TROJAN REALITY</button>
+                  </div>
+
+                  <div class="border-lbl">BUG SNI (NORMAL)</div>
+                  <div class="grid-3">
+                    <button onclick="buildConfig('vless', 'sni', event)" class="btn-blue">VLESS</button>
+                    <button onclick="buildConfig('vmess', 'sni', event)" class="btn-blue">VMESS</button>
+                    <button onclick="buildConfig('trojan', 'sni', event)" class="btn-blue">TROJAN</button>
+                  </div>
+
+                  <div class="border-lbl">BUG SNI (REVERSE)</div>
+                  <div class="grid-3">
+                    <button onclick="buildConfig('vless', 'sni_reverse', event)" class="btn-blue">VLESS REV</button>
+                    <button onclick="buildConfig('vmess', 'sni_reverse', event)" class="btn-blue">VMESS REV</button>
+                    <button onclick="buildConfig('trojan', 'sni_reverse', event)" class="btn-blue">TROJAN REV</button>
+                  </div>
+
+                  <div class="border-lbl">BUG CDN (PROXY)</div>
+                  <div class="grid-3">
+                    <button onclick="buildConfig('vless', 'cdn', event)" class="btn-blue">VLESS</button>
+                    <button onclick="buildConfig('vmess', 'cdn', event)" class="btn-blue">VMESS</button>
+                    <button onclick="buildConfig('trojan', 'cdn', event)" class="btn-blue">TROJAN</button>
+                  </div>
+
+                  <div id="output-area" class="result-box" style="margin-top: 12px; display: none;">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 6px; font-size: 11px;">
+                      <span id="out-type" style="color: #0284c7;">CONFIG</span>
+                      <span onclick="copyOutConfig()" style="cursor: pointer; text-decoration: underline; color: #0284c7;">[COPY]</span>
+                    </div>
+                    <p id="configText" style="word-break: break-all; color: #0f172a; max-height: 120px; overflow-y: auto; font-family: ui-monospace, monospace; white-space: pre-wrap;"></p>
+                  </div>
+                </div>
+            </div>
+
+            <p class="note">Single terowongan multi-host berjalan sinkron.<br>Node.js Core Engine Rendering System.</p>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
