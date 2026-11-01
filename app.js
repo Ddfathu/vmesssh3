@@ -369,16 +369,24 @@ async function updateStats() {
         document.getElementById('sni-url').innerText = data.railway_sni || "Tidak Aktif"; 
         document.getElementById('quick-url').innerText = data.quick_url || "Menunggu Quick Tunnel...";
 
+        // ========================================================
+        // POPULASI DROPDOWN GENERATOR DOMAIN (AUTO-DETECT WOKKU)
+        // ========================================================
+        let currentHostDomain = window.location.hostname;
         let domainSelect = document.getElementById('domainSelect');
         let currentSelected = domainSelect.value;
         let optionsHtml = '';
+
+        if (currentHostDomain) {
+            optionsHtml += '<option value="' + currentHostDomain + '">Domain Utama (Wokku): ' + currentHostDomain + '</option>';
+        }
 
         if (railwayDomainStored) {
             optionsHtml += '<option value="' + railwayDomainStored + '">Railway Reality: ' + railwayDomainStored + '</option>';
         }
 
         if (data.quick_url && !data.quick_url.includes("Menunggu")) {
-            optionsHtml += '<option value="' + data.quick_url + '">Quick: ' + data.quick_url + '</option>';
+            optionsHtml += '<option value="' + data.quick_url + '">Quick Tunnel: ' + data.quick_url + '</option>';
         }
 
         if (data.zt_vmess_domains && data.zt_vmess_domains.length > 0) {
@@ -471,7 +479,7 @@ async function deleteAccount(username) {
 }
 
 // ========================================================
-// AKSI COPY TOMBOL (DENGAN UNIVERSAL COPY ENGINE)
+// AKSI COPY TOMBOL
 // ========================================================
 function copyTxt(elementId, btnId) {
     let elem = document.getElementById(elementId);
@@ -510,7 +518,7 @@ function copyOutConfig() {
 }
 
 // ========================================================
-// CONFIG GENERATOR ENGINE (V2RAYNG OPTIMIZED PORT 443 / 80)
+// CONFIG GENERATOR ENGINE (SUPPORT PORT 443 TLS & 80 NTLS)
 // ========================================================
 async function fetchServerInfo() {
     try {
@@ -566,11 +574,10 @@ function buildConfig(protocol, type, evt) {
     const bugHost = document.getElementById('bugInput').value.trim() || host; 
     const engine = document.getElementById('engineSelect').value;
     
-    // 🔹 PORT SELECTION (443 & 80)
     const selectedPort = document.getElementById('portSelect') ? document.getElementById('portSelect').value : "443";
     const isTls = selectedPort === "443";
     const securityMode = isTls ? "tls" : "none";
-    const fpParam = isTls ? "&fp=chrome" : ""; // Auto Fingerprint di Port 443
+    const fpParam = isTls ? "&fp=chrome" : "";
 
     const area = document.getElementById('output-area');
     const label = document.getElementById('out-type');
@@ -594,55 +601,27 @@ function buildConfig(protocol, type, evt) {
     let targetWsHost = (type === 'sni_reverse') ? bugHost : host;
     let finalPath = (type === 'cdn') ? ('/' + bugHost + basePath) : basePath;
 
-    // --- GENERATE VLESS ---
     if (protocol === 'vless') {
         let q = '?encryption=none&security=' + securityMode;
         if (isTls) q += '&sni=' + targetSni + fpParam;
-        
         q += '&type=' + netType;
-        if (netType === 'grpc') {
-            q += '&serviceName=grpc-service';
-        } else if (netType === 'h2') {
-            q += '&host=' + targetWsHost + '&path=/h2-path';
-        } else if (netType === 'ws') {
-            q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
-        }
+        if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
         
         configResult = 'vless://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
     } 
-    // --- GENERATE VMESS ---
     else if (protocol === 'vmess') {
         let jsonVmess = {
-            v: "2",
-            ps: remark,
-            add: targetConnect,
-            port: selectedPort,
-            id: uuid,
-            aid: "0",
-            scy: "auto",
-            net: netType,
-            type: "none",
-            host: targetWsHost,
-            path: (netType === 'grpc' ? 'grpc-service' : (netType === 'h2' ? '/h2-path' : finalPath)),
-            tls: isTls ? "tls" : "",
-            sni: isTls ? targetSni : "",
-            fp: isTls ? "chrome" : ""
+            v: "2", ps: remark, add: targetConnect, port: selectedPort, id: uuid, aid: "0",
+            scy: "auto", net: netType, type: "none", host: targetWsHost, path: finalPath,
+            tls: isTls ? "tls" : "", sni: isTls ? targetSni : "", fp: isTls ? "chrome" : ""
         };
         configResult = 'vmess://' + toBase64(JSON.stringify(jsonVmess));
     } 
-    // --- GENERATE TROJAN ---
     else if (protocol === 'trojan') {
         let q = '?security=' + securityMode;
         if (isTls) q += '&sni=' + targetSni + fpParam;
-        
         q += '&type=' + netType;
-        if (netType === 'grpc') {
-            q += '&serviceName=grpc-service';
-        } else if (netType === 'h2') {
-            q += '&host=' + targetWsHost + '&path=/h2-path';
-        } else if (netType === 'ws') {
-            q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
-        }
+        if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
         
         configResult = 'trojan://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
     }
@@ -652,7 +631,7 @@ function buildConfig(protocol, type, evt) {
 }
 
 // ========================================================
-// INISIALISASI
+// INISIALISASI HALAMAN
 // ========================================================
 setInterval(updateStats, 300000); 
 updateStats(); 

@@ -149,6 +149,7 @@ function loadDb() {
     }
     return {};
 }
+
 function saveDb(data) {
     try { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2)); } catch (e) {}
 }
@@ -495,6 +496,9 @@ async function generateLinks(argoDomain) {
   fs.writeFileSync(subPath, subContent);
 }
 
+// ========================================================
+// HTTP SERVER (API & STATIC FILES HANDLER)
+// ========================================================
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathName = parsedUrl.pathname;
@@ -739,9 +743,7 @@ const server = http.createServer(async (req, res) => {
         }));
     }
 
-    // ========================================================
-    // ROUTING SERVING FILE STATIS (HTML, CSS, JS)
-    // ========================================================
+    // --- SERVING FILE STATIS (HTML, CSS, JS) ---
     if (pathName === '/' || pathName === '/index.html') {
         const filePath = path.join(__dirname, 'index.html');
         if (fs.existsSync(filePath)) {
@@ -779,42 +781,51 @@ const server = http.createServer(async (req, res) => {
     res.end("Not Found");
 });
 
-function forwardConnection(targetPort, req, socket, head) {
-  const targetConn = require('net').createConnection({ port: targetPort, host: '127.0.0.1' }, () => {
-    let rawHeaders = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
-    for (let i = 0; i < req.rawHeaders.length; i += 2) {
-      rawHeaders += `${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}\r\n`;
-    }
-    rawHeaders += '\r\n';
-    targetConn.write(rawHeaders);
-    if (head && head.length > 0) targetConn.write(head);
-    socket.pipe(targetConn).pipe(socket);
-  });
+// ========================================================
+// HANDLER WEBSOCKET DUAL-MODE (UI WEB & VPN XRAY FORWARDING)
+// ========================================================
+function forwardWebsocket(targetPort, req, socket, head) {
+    const net = require('net');
+    const targetConn = net.createConnection({ port: targetPort, host: '127.0.0.1' }, () => {
+        let rawHeaders = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
+        for (let i = 0; i < req.rawHeaders.length; i += 2) {
+            rawHeaders += `${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}\r\n`;
+        }
+        rawHeaders += '\r\n';
+        
+        targetConn.write(rawHeaders);
+        if (head && head.length > 0) targetConn.write(head);
+        
+        socket.pipe(targetConn);
+        targetConn.pipe(socket);
+    });
 
-  targetConn.on('error', () => socket.destroy());
-  socket.on('error', () => targetConn.destroy());
+    targetConn.on('error', () => {
+        try { socket.destroy(); } catch(e){}
+    });
+    
+    socket.on('error', () => {
+        try { targetConn.destroy(); } catch(e){}
+    });
 }
 
 server.on('upgrade', (req, socket, head) => {
-  const urlPath = req.url.split('?')[0];
-  if (urlPath === '/ssh-ws') {
-    const wsCfg = getWsProxyConfig();
-    const targetPort = wsCfg.sshPort || 8880;
-    const targetConn = require('net').createConnection({ port: targetPort, host: '127.0.0.1' }, () => {
-      let rawHeaders = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
-      for (let i = 0; i < req.rawHeaders.length; i += 2) { rawHeaders += `${req.rawHeaders[i]}: ${req.rawHeaders[i+1]}\r\n`; }
-      rawHeaders += '\r\n';
-      targetConn.write(rawHeaders);
-      if (head && head.length > 0) targetConn.write(head);
-      socket.pipe(targetConn).pipe(socket);
-    });
-    targetConn.on('error', () => socket.destroy());
-    socket.on('error', () => targetConn.destroy());
-  } else {
-    socket.destroy();
-  }
+    const urlPath = req.url.split('?')[0];
+
+    // Jika Request WebSocket khusus SSH WS
+    if (urlPath === '/ssh-ws' || urlPath.startsWith('/ssh')) {
+        const wsCfg = getWsProxyConfig();
+        const targetPort = wsCfg.sshPort || 22;
+        return forwardWebsocket(targetPort, req, socket, head);
+    }
+    
+    // Semua Request WebSocket (VLESS / VMess / Trojan) langsung dilayangkan ke Xray (Port 8001)
+    return forwardWebsocket(ARGO_PORT, req, socket, head);
 });
 
+// ========================================================
+// START LISTEN SERVER
+// ========================================================
 server.listen(PORT, () => {
     console.log(`[UI & Xray Gateway Engine] Running seamlessly on port ${PORT}`);
     generateConfig().then(() => downloadFilesAndRun()).then(() => extractDomains()).catch(e => console.error(e));
