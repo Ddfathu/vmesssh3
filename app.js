@@ -369,16 +369,14 @@ async function updateStats() {
         document.getElementById('sni-url').innerText = data.railway_sni || "Tidak Aktif"; 
         document.getElementById('quick-url').innerText = data.quick_url || "Menunggu Quick Tunnel...";
 
-        // ========================================================
-        // POPULASI DROPDOWN GENERATOR DOMAIN (AUTO-DETECT URL)
-        // ========================================================
+        // POPULASI DROPDOWN GENERATOR DOMAIN (AUTO-DETECT URL WOKKU)
         let currentHostDomain = window.location.hostname;
         let domainSelect = document.getElementById('domainSelect');
         let currentSelected = domainSelect.value;
         let optionsHtml = '';
 
         if (currentHostDomain) {
-            optionsHtml += '<option value="' + currentHostDomain + '">Domain dari url: ' + currentHostDomain + '</option>';
+            optionsHtml += '<option value="' + currentHostDomain + '">Domain Utama: ' + currentHostDomain + '</option>';
         }
 
         if (railwayDomainStored) {
@@ -518,7 +516,141 @@ function copyOutConfig() {
 }
 
 // ========================================================
-// CONFIG GENERATOR ENGINE (SUPPORT PORT 443 TLS & 80 NTLS)
+// CONVERTER GENERATOR ENGINES (CLASH & SINGBOX)
+// ========================================================
+function generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark) {
+    const isTls = selectedPort === "443";
+    if (protocol === 'vless') {
+        return `
+proxies:
+  - name: "${remark}"
+    type: vless
+    server: ${targetConnect}
+    port: ${parseInt(selectedPort)}
+    uuid: ${uuid}
+    udp: true
+    tls: ${isTls}
+    servername: ${targetSni}
+    skip-cert-verify: true
+    network: ws
+    ws-opts:
+      path: "${finalPath}"
+      headers:
+        Host: ${targetWsHost}
+`.trim();
+    } else if (protocol === 'vmess') {
+        return `
+proxies:
+  - name: "${remark}"
+    type: vmess
+    server: ${targetConnect}
+    port: ${parseInt(selectedPort)}
+    uuid: ${uuid}
+    alterId: 0
+    cipher: auto
+    udp: true
+    tls: ${isTls}
+    servername: ${targetSni}
+    skip-cert-verify: true
+    network: ws
+    ws-opts:
+      path: "${finalPath}"
+      headers:
+        Host: ${targetWsHost}
+`.trim();
+    } else {
+        return `
+proxies:
+  - name: "${remark}"
+    type: trojan
+    server: ${targetConnect}
+    port: ${parseInt(selectedPort)}
+    password: ${uuid}
+    udp: true
+    sni: ${targetSni}
+    skip-cert-verify: true
+    network: ws
+    ws-opts:
+      path: "${finalPath}"
+      headers:
+        Host: ${targetWsHost}
+`.trim();
+    }
+}
+
+function generateClashMihomo(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark) {
+    const proxyYaml = generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
+    return `
+mixed-port: 7890
+allow-lan: true
+mode: rule
+log-level: info
+ipv6: false
+
+dns:
+  enable: true
+  enhanced-mode: fake-ip
+  nameserver:
+    - 8.8.8.8
+    - 1.1.1.1
+
+${proxyYaml}
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - "${remark}"
+      - DIRECT
+
+rules:
+  - GEOIP,LAN,DIRECT
+  - MATCH,PROXY
+`.trim();
+}
+
+function generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark) {
+    const isTls = selectedPort === "443";
+    let outboundObj = {
+        type: protocol,
+        tag: remark,
+        server: targetConnect,
+        server_port: parseInt(selectedPort),
+        transport: {
+            type: "ws",
+            path: finalPath,
+            headers: {
+                Host: targetWsHost
+            }
+        }
+    };
+
+    if (protocol === 'vless' || protocol === 'vmess') {
+        outboundObj.uuid = uuid;
+    } else if (protocol === 'trojan') {
+        outboundObj.password = uuid;
+    }
+
+    if (isTls) {
+        outboundObj.tls = {
+            enabled: true,
+            server_name: targetSni,
+            insecure: true
+        };
+    }
+
+    const fullConfig = {
+        log: { level: "info" },
+        inbounds: [{ type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 }],
+        outbounds: [outboundObj, { type: "direct", tag: "direct" }],
+        route: { auto_detect_interface: true }
+    };
+
+    return JSON.stringify(fullConfig, null, 2);
+}
+
+// ========================================================
+// CONFIG GENERATOR ENGINE (V2RAY / CLASH / SINGBOX)
 // ========================================================
 async function fetchServerInfo() {
     try {
@@ -575,6 +707,7 @@ function buildConfig(protocol, type, evt) {
     const engine = document.getElementById('engineSelect').value;
     
     const selectedPort = document.getElementById('portSelect') ? document.getElementById('portSelect').value : "443";
+    const selectedFormat = document.getElementById('formatSelect') ? document.getElementById('formatSelect').value : "standard";
     const isTls = selectedPort === "443";
     const securityMode = isTls ? "tls" : "none";
     const fpParam = isTls ? "&fp=chrome" : "";
@@ -593,7 +726,6 @@ function buildConfig(protocol, type, evt) {
     
     let remark = 'DDFATHU-' + protocol.toUpperCase() + '-' + type.toUpperCase() + '-' + selectedPort;
     let configResult = '';
-    label.innerText = remark;
 
     let netType = engine;
     let targetConnect = (type === 'sni') ? bugHost : host;
@@ -601,29 +733,46 @@ function buildConfig(protocol, type, evt) {
     let targetWsHost = (type === 'sni_reverse') ? bugHost : host;
     let finalPath = (type === 'cdn') ? ('/' + bugHost + basePath) : basePath;
 
-    if (protocol === 'vless') {
-        let q = '?encryption=none&security=' + securityMode;
-        if (isTls) q += '&sni=' + targetSni + fpParam;
-        q += '&type=' + netType;
-        if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
-        
-        configResult = 'vless://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
+    // --- HASIL BERDASARKAN FORMAT PILIHAN ---
+    if (selectedFormat === 'clash_proxy') {
+        label.innerText = remark + ' (CLASH PROXY)';
+        configResult = generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
     } 
-    else if (protocol === 'vmess') {
-        let jsonVmess = {
-            v: "2", ps: remark, add: targetConnect, port: selectedPort, id: uuid, aid: "0",
-            scy: "auto", net: netType, type: "none", host: targetWsHost, path: finalPath,
-            tls: isTls ? "tls" : "", sni: isTls ? targetSni : "", fp: isTls ? "chrome" : ""
-        };
-        configResult = 'vmess://' + toBase64(JSON.stringify(jsonVmess));
+    else if (selectedFormat === 'clash_mihomo') {
+        label.innerText = remark + ' (CLASH MIHOMO)';
+        configResult = generateClashMihomo(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
     } 
-    else if (protocol === 'trojan') {
-        let q = '?security=' + securityMode;
-        if (isTls) q += '&sni=' + targetSni + fpParam;
-        q += '&type=' + netType;
-        if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
-        
-        configResult = 'trojan://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
+    else if (selectedFormat === 'singbox') {
+        label.innerText = remark + ' (SINGBOX JSON)';
+        configResult = generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
+    } 
+    else {
+        // STANDARD V2RAY LINK (DEFAULT)
+        label.innerText = remark;
+        if (protocol === 'vless') {
+            let q = '?encryption=none&security=' + securityMode;
+            if (isTls) q += '&sni=' + targetSni + fpParam;
+            q += '&type=' + netType;
+            if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
+            
+            configResult = 'vless://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
+        } 
+        else if (protocol === 'vmess') {
+            let jsonVmess = {
+                v: "2", ps: remark, add: targetConnect, port: selectedPort, id: uuid, aid: "0",
+                scy: "auto", net: netType, type: "none", host: targetWsHost, path: finalPath,
+                tls: isTls ? "tls" : "", sni: isTls ? targetSni : "", fp: isTls ? "chrome" : ""
+            };
+            configResult = 'vmess://' + toBase64(JSON.stringify(jsonVmess));
+        } 
+        else if (protocol === 'trojan') {
+            let q = '?security=' + securityMode;
+            if (isTls) q += '&sni=' + targetSni + fpParam;
+            q += '&type=' + netType;
+            if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
+            
+            configResult = 'trojan://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
+        }
     }
 
     txt.innerText = configResult;

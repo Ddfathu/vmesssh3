@@ -282,7 +282,6 @@
                     </div>
                   </div>
 
-                  <!-- 🔹 FITUR BARU: PILIHAN PORT 443 DAN 80 -->
                   <div class="grid-2">
                     <div>
                       <label class="lbl-vpn">BUG HOST (SNI / CDN)</label>
@@ -295,6 +294,17 @@
                         <option value="80">Port 80 (NTLS / Direct)</option>
                       </select>
                     </div>
+                  </div>
+
+                  <!-- 🔹 FITUR FORMAT CONVERTER (CLASH & SINGBOX) -->
+                  <div style="margin-bottom: 10px;">
+                    <label class="lbl-vpn">FORMAT OUTPUT CONFIG</label>
+                    <select id="formatSelect" class="input-ssh" style="font-family: ui-monospace, monospace; font-weight: bold;">
+                      <option value="standard">Standard Link (v2rayNG / DarkTunnel)</option>
+                      <option value="clash_proxy">Clash - Proxy Only (YAML)</option>
+                      <option value="clash_mihomo">Clash - Mihomo (Full YAML)</option>
+                      <option value="singbox">SingBox (Full JSON)</option>
+                    </select>
                   </div>
 
                   <div class="border-lbl" style="color: #059669; border-color: #059669;">REALITY / RAILWAY</div>
