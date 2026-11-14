@@ -52,7 +52,7 @@ function getNetworkSettings() {
             return JSON.parse(fs.readFileSync(NET_SETTING_FILE, 'utf8'));
         }
     } catch(e) {}
-    return { dns_type: "udp", custom_dns: "8.8.8.8", engine: "ws" };
+    return { dns_type: "udp", custom_dns: "8.8.8.8", engine: "httpupgrade" };
 }
 
 function saveNetworkSettings(dns_type, custom_dns, engine) {
@@ -314,6 +314,9 @@ function readPathsFromFile(filename, defaultPath) {
   return [defaultPath]; 
 }
 
+// ========================================================
+// GENERATOR CONFIG XRAY-CORE (FULL SUPPORT HTTPUPGRADE)
+// ========================================================
 async function generateConfig() {
   const netSettings = getNetworkSettings();
   const vlessPaths = readPathsFromFile('pathvless.txt', '/vless-argo');
@@ -324,13 +327,15 @@ async function generateConfig() {
   const inboundsList = [];
   let nextPort = 3100;
 
-  const engine = netSettings.engine || 'ws';
+  const engine = netSettings.engine || 'httpupgrade';
 
   let streamSettingsObj = {};
   if (engine === 'grpc') {
     streamSettingsObj = { network: "grpc", security: "none", grpcSettings: { serviceName: "grpc-service" } };
   } else if (engine === 'h2') {
     streamSettingsObj = { network: "h2", security: "none", httpSettings: { path: "/h2-path", host: ["localhost"] } };
+  } else if (engine === 'httpupgrade') {
+    streamSettingsObj = { network: "httpupgrade", security: "none" };
   } else if (engine === 'tcp') {
     streamSettingsObj = { network: "tcp", security: "none" };
   } else {
@@ -342,6 +347,7 @@ async function generateConfig() {
     fallbacksList.push({ path: p, dest: cp }); 
     let st = JSON.parse(JSON.stringify(streamSettingsObj));
     if (engine === 'ws') st.wsSettings = { path: p };
+    else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
 
     inboundsList.push({ 
         port: cp, listen: "127.0.0.1", protocol: 'vless', 
@@ -356,6 +362,7 @@ async function generateConfig() {
     fallbacksList.push({ path: p, dest: cp }); 
     let st = JSON.parse(JSON.stringify(streamSettingsObj));
     if (engine === 'ws') st.wsSettings = { path: p };
+    else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
 
     inboundsList.push({ 
         port: cp, listen: "127.0.0.1", protocol: "vmess", 
@@ -370,6 +377,7 @@ async function generateConfig() {
     fallbacksList.push({ path: p, dest: cp }); 
     let st = JSON.parse(JSON.stringify(streamSettingsObj));
     if (engine === 'ws') st.wsSettings = { path: p };
+    else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
 
     inboundsList.push({ 
         port: cp, listen: "127.0.0.1", protocol: "trojan", 
@@ -463,36 +471,94 @@ async function extractDomains() {
 
 async function getMetaInfo() { try { const res = await axios.get('https://api.ip.sb/geoip'); return `${res.data.country_code}-${res.data.isp}`.replace(/\s+/g, '_'); } catch(e) { return 'RailwayServer'; } }
 
+// ========================================================
+// CONFIG GENERATOR ENGINE (VLESS / VMESS / TROJAN)
+// ========================================================
+function buildCustomConfigLinks({
+    domain,
+    bugAddress,
+    sni,
+    port = 443,
+    transport = 'httpupgrade',
+    security = 'tls',
+    alpn = 'http/1.1',
+    allowInsecure = false,
+    tagPrefix = NAME
+}) {
+    const activePort = String(port);
+    const activeSecurity = (activePort === '80' || security === 'none') ? 'none' : 'tls';
+    const targetAddress = (bugAddress && bugAddress.trim()) ? bugAddress.trim() : getActiveCfip();
+    const targetSni = (sni && sni.trim()) ? sni.trim() : domain;
+    const netType = (transport === 'httpupgrade') ? 'httpupgrade' : 'ws';
+
+    const defaultVless = readPathsFromFile('pathvless.txt', '/vless-argo')[0];
+    const defaultVmess = readPathsFromFile('pathvmess.txt', '/vmess-argo')[0];
+    const defaultTrojan = readPathsFromFile('pathtrojan.txt', '/trojan-argo')[0];
+
+    const labelSuffix = `${netType.toUpperCase()}-${activeSecurity === 'tls' ? 'TLS' : 'NTLS'}-${activePort}`;
+
+    // 1. VMESS JSON BASE64
+    const vmessObj = {
+        v: "2",
+        ps: `${tagPrefix}-VMESS-${labelSuffix}`,
+        add: targetAddress,
+        port: activePort,
+        id: UUID,
+        aid: "0",
+        scy: "auto",
+        net: netType,
+        type: "none",
+        host: domain,
+        path: defaultVmess,
+        tls: activeSecurity === 'tls' ? "tls" : "",
+        sni: activeSecurity === 'tls' ? targetSni : "",
+        alpn: activeSecurity === 'tls' ? alpn : ""
+    };
+    const vmessLink = `vmess://${Buffer.from(JSON.stringify(vmessObj)).toString('base64')}`;
+
+    // 2. VLESS URI
+    let vlessQuery = `encryption=none&security=${activeSecurity}&type=${netType}&host=${encodeURIComponent(domain)}&path=${encodeURIComponent(defaultVless)}`;
+    if (activeSecurity === 'tls') {
+        vlessQuery += `&sni=${encodeURIComponent(targetSni)}&alpn=${encodeURIComponent(alpn)}`;
+        if (allowInsecure) vlessQuery += `&allowInsecure=1`;
+    }
+    const vlessLink = `vless://${UUID}@${targetAddress}:${activePort}?${vlessQuery}#${encodeURIComponent(`${tagPrefix}-VLESS-${labelSuffix}`)}`;
+
+    // 3. TROJAN URI
+    let trojanQuery = `security=${activeSecurity}&type=${netType}&host=${encodeURIComponent(domain)}&path=${encodeURIComponent(defaultTrojan)}`;
+    if (activeSecurity === 'tls') {
+        trojanQuery += `&sni=${encodeURIComponent(targetSni)}&alpn=${encodeURIComponent(alpn)}`;
+        if (allowInsecure) trojanQuery += `&allowInsecure=1`;
+    }
+    const trojanLink = `trojan://${UUID}@${targetAddress}:${activePort}?${trojanQuery}#${encodeURIComponent(`${tagPrefix}-TROJAN-${labelSuffix}`)}`;
+
+    return {
+        vless: vlessLink,
+        vmess: vmessLink,
+        trojan: trojanLink,
+        combined: `${vlessLink}\n${vmessLink}\n${trojanLink}`
+    };
+}
+
 async function generateLinks(argoDomain) {
   const ISP = await getMetaInfo();
   const nodeName = `${NAME}-${ISP}`;
-  const activeCfip = getActiveCfip();
-  const defaultVless = readPathsFromFile('pathvless.txt', '/vless-argo')[0];
-  const defaultVmess = readPathsFromFile('pathvmess.txt', '/vmess-argo')[0];
-  const defaultTrojan = readPathsFromFile('pathtrojan.txt', '/trojan-argo')[0];
-  
-  const vmessObj = {
-    v: "2",
-    ps: nodeName,
-    add: activeCfip,
-    port: String(CFPORT),
-    id: UUID,
-    aid: "0",
-    scy: "auto",
-    net: "ws",
-    type: "none",
-    host: argoDomain,
-    path: defaultVmess,
-    tls: "tls",
-    sni: argoDomain
-  };
-  
-  const vmessLink = `vmess://${Buffer.from(JSON.stringify(vmessObj)).toString('base64')}`;
-  const vlessLink = `vless://${UUID}@${activeCfip}:${CFPORT}?encryption=none&security=tls&sni=${argoDomain}&type=ws&host=${argoDomain}&path=${encodeURIComponent(defaultVless)}#${encodeURIComponent(nodeName)}`;
-  const trojanLink = `trojan://${UUID}@${activeCfip}:${CFPORT}?security=tls&sni=${argoDomain}&type=ws&host=${argoDomain}&path=${encodeURIComponent(defaultTrojan)}#${encodeURIComponent(nodeName)}`;
-  
-  const subTxt = `${vlessLink}\n${vmessLink}\n${trojanLink}`;
-  subContent = Buffer.from(subTxt).toString('base64');
+  const netSettings = getNetworkSettings();
+  const currentEngine = netSettings.engine || 'httpupgrade';
+  const linkType = (currentEngine === 'httpupgrade') ? 'httpupgrade' : 'ws';
+
+  const generated = buildCustomConfigLinks({
+      domain: argoDomain,
+      bugAddress: getActiveCfip(),
+      sni: argoDomain,
+      port: CFPORT,
+      transport: linkType,
+      security: String(CFPORT) === '80' ? 'none' : 'tls',
+      alpn: 'http/1.1',
+      tagPrefix: nodeName
+  });
+
+  subContent = Buffer.from(generated.combined).toString('base64');
   fs.writeFileSync(subPath, subContent);
 }
 
@@ -513,6 +579,47 @@ const server = http.createServer(async (req, res) => {
         return res.end(subContent || (fs.existsSync(subPath) ? fs.readFileSync(subPath, 'utf-8') : 'Loading sub...'));
     }
 
+    // ENDPOINT BARU: CONFIG GENERATOR CUSTOM (WS / HTTPUPGRADE / SNI / PORT 80 & 443)
+    if (pathName === '/api/generate-config') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        const ztVmessDomains = getDomainsByPort(['8001']);
+        const fallbackDomain = ztVmessDomains.length > 0 ? ztVmessDomains[0].domain : (currentActiveDomain || "vpn.dfathu.com");
+        
+        const targetDomain = (query.domain && query.domain.trim()) ? query.domain.trim() : fallbackDomain;
+        const bugHost = (query.bug && query.bug.trim()) ? query.bug.trim() : getActiveCfip();
+        const customSni = (query.sni && query.sni.trim()) ? query.sni.trim() : (query.bug && query.bug.trim() ? query.bug.trim() : targetDomain);
+        const port = query.port || '443';
+        const transport = query.transport || getNetworkSettings().engine || 'httpupgrade';
+        const security = query.security || (port === '80' ? 'none' : 'tls');
+        const alpn = query.alpn || 'http/1.1';
+        const allowInsecure = query.insecure === 'true' || query.insecure === '1';
+
+        const links = buildCustomConfigLinks({
+            domain: targetDomain,
+            bugAddress: bugHost,
+            sni: customSni,
+            port: port,
+            transport: transport,
+            security: security,
+            alpn: alpn,
+            allowInsecure: allowInsecure
+        });
+
+        return res.end(JSON.stringify({
+            status: "success",
+            params: {
+                domain_host: targetDomain,
+                address_bug: bugHost,
+                sni: customSni,
+                port: port,
+                transport: transport,
+                security: security,
+                alpn: alpn
+            },
+            configs: links
+        }, null, 2));
+    }
+
     if (pathName === '/__info') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         const defaultVless = readPathsFromFile('pathvless.txt', '/vless-argo')[0];
@@ -521,6 +628,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ 
             uuid: UUID, 
             cfip: getActiveCfip(),
+            engine: getNetworkSettings().engine || 'httpupgrade',
             domain: currentActiveDomain || "Menunggu Quick Tunnel...", 
             paths: { vless: defaultVless, vmess: defaultVmess, trojan: defaultTrojan } 
         }));
@@ -567,10 +675,11 @@ const server = http.createServer(async (req, res) => {
         }
         const dns_type = query.dns_type || "udp";
         const custom_dns = query.custom_dns ? decodeURIComponent(query.custom_dns) : "8.8.8.8";
-        const engine = query.engine || "ws";
+        const engine = query.engine || "httpupgrade";
         
         saveNetworkSettings(dns_type, custom_dns, engine);
         await generateConfig();
+        if (currentActiveDomain) await generateLinks(currentActiveDomain);
         
         exec(`pkill -9 -f '${webName}'`, () => {
             setTimeout(() => {
@@ -782,9 +891,9 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ========================================================
-// HANDLER WEBSOCKET DUAL-MODE (UI WEB & VPN XRAY FORWARDING)
+// HANDLER WEBSOCKET & HTTPUPGRADE DUAL-MODE
 // ========================================================
-function forwardWebsocket(targetPort, req, socket, head) {
+function forwardUpgradeStream(targetPort, req, socket, head) {
     const net = require('net');
     const targetConn = net.createConnection({ port: targetPort, host: '127.0.0.1' }, () => {
         let rawHeaders = `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`;
@@ -816,18 +925,18 @@ server.on('upgrade', (req, socket, head) => {
     if (urlPath === '/ssh-ws' || urlPath.startsWith('/ssh')) {
         const wsCfg = getWsProxyConfig();
         const targetPort = wsCfg.sshPort || 22;
-        return forwardWebsocket(targetPort, req, socket, head);
+        return forwardUpgradeStream(targetPort, req, socket, head);
     }
     
-    // Semua Request WebSocket (VLESS / VMess / Trojan) langsung dilayangkan ke Xray (Port 8001)
-    return forwardWebsocket(ARGO_PORT, req, socket, head);
+    // Semua Request WebSocket & HTTPUpgrade (VLESS / VMess / Trojan) diteruskan ke Xray (Port 8001)
+    return forwardUpgradeStream(ARGO_PORT, req, socket, head);
 });
 
 // ========================================================
 // START LISTEN SERVER
 // ========================================================
 server.listen(PORT, () => {
-    console.log(`[UI & Xray Gateway Engine] Running seamlessly on port ${PORT}`);
+    console.log(`[UI & Xray Gateway Engine - HTTPUpgrade Ready] Running on port ${PORT}`);
     generateConfig().then(() => downloadFilesAndRun()).then(() => extractDomains()).catch(e => console.error(e));
     
     if (fs.existsSync(ZT_SINGLE_TOKEN_FILE)) {

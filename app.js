@@ -201,7 +201,13 @@ async function saveDnsNetworkSetting() {
         let res = await fetch('/api/set-network?pass=' + encodeURIComponent(adminToken) + '&dns_type=' + dnsType + '&custom_dns=' + encodeURIComponent(customDns) + '&engine=' + engine);
         let data = await res.json();
         alert(data.message);
-        if (data.status === "success") updateStats();
+        if (data.status === "success") {
+            let genTransport = document.getElementById('transportSelect');
+            if (genTransport && (engine === 'ws' || engine === 'httpupgrade')) {
+                genTransport.value = engine;
+            }
+            updateStats();
+        }
     } catch(e) { alert("Gagal menyimpan konfigurasi ke backend!"); }
 }
 
@@ -310,6 +316,10 @@ async function updateStats() {
         if (data.engine_mode) {
             document.getElementById('engineSelect').value = data.engine_mode;
             document.getElementById('display-engine').innerText = data.engine_mode.toUpperCase();
+            let genTransport = document.getElementById('transportSelect');
+            if (genTransport && (data.engine_mode === 'ws' || data.engine_mode === 'httpupgrade')) {
+                genTransport.value = data.engine_mode;
+            }
         }
         if (data.ws_proxy_cfg) {
             let pDrop = document.getElementById('wsPortDropdown');
@@ -369,7 +379,7 @@ async function updateStats() {
         document.getElementById('sni-url').innerText = data.railway_sni || "Tidak Aktif"; 
         document.getElementById('quick-url').innerText = data.quick_url || "Menunggu Quick Tunnel...";
 
-        // POPULASI DROPDOWN GENERATOR DOMAIN (AUTO-DETECT URL WOKKU)
+        // POPULASI DROPDOWN GENERATOR DOMAIN
         let currentHostDomain = window.location.hostname;
         let domainSelect = document.getElementById('domainSelect');
         let currentSelected = domainSelect.value;
@@ -516,10 +526,15 @@ function copyOutConfig() {
 }
 
 // ========================================================
-// CONVERTER GENERATOR ENGINES (CLASH & SINGBOX)
+// CONVERTER GENERATOR ENGINES (CLASH & SINGBOX - WS & HTTPUPGRADE)
 // ========================================================
-function generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark) {
+function generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType) {
     const isTls = selectedPort === "443";
+    const isH2Up = netType === "httpupgrade";
+    const optsBlock = isH2Up
+        ? `    network: httpupgrade\n    httpupgrade-opts:\n      path: "${finalPath}"\n      host: ${targetWsHost}`
+        : `    network: ws\n    ws-opts:\n      path: "${finalPath}"\n      headers:\n        Host: ${targetWsHost}`;
+
     if (protocol === 'vless') {
         return `
 proxies:
@@ -532,11 +547,7 @@ proxies:
     tls: ${isTls}
     servername: ${targetSni}
     skip-cert-verify: true
-    network: ws
-    ws-opts:
-      path: "${finalPath}"
-      headers:
-        Host: ${targetWsHost}
+${optsBlock}
 `.trim();
     } else if (protocol === 'vmess') {
         return `
@@ -552,11 +563,7 @@ proxies:
     tls: ${isTls}
     servername: ${targetSni}
     skip-cert-verify: true
-    network: ws
-    ws-opts:
-      path: "${finalPath}"
-      headers:
-        Host: ${targetWsHost}
+${optsBlock}
 `.trim();
     } else {
         return `
@@ -569,17 +576,13 @@ proxies:
     udp: true
     sni: ${targetSni}
     skip-cert-verify: true
-    network: ws
-    ws-opts:
-      path: "${finalPath}"
-      headers:
-        Host: ${targetWsHost}
+${optsBlock}
 `.trim();
     }
 }
 
-function generateClashMihomo(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark) {
-    const proxyYaml = generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
+function generateClashMihomo(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType) {
+    const proxyYaml = generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType);
     return `
 mixed-port: 7890
 allow-lan: true
@@ -609,20 +612,28 @@ rules:
 `.trim();
 }
 
-function generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark) {
+function generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType) {
     const isTls = selectedPort === "443";
+    const isH2Up = netType === "httpupgrade";
+
+    let transportObj = isH2Up ? {
+        type: "httpupgrade",
+        host: targetWsHost,
+        path: finalPath
+    } : {
+        type: "ws",
+        path: finalPath,
+        headers: {
+            Host: targetWsHost
+        }
+    };
+
     let outboundObj = {
         type: protocol,
         tag: remark,
         server: targetConnect,
         server_port: parseInt(selectedPort),
-        transport: {
-            type: "ws",
-            path: finalPath,
-            headers: {
-                Host: targetWsHost
-            }
-        }
+        transport: transportObj
     };
 
     if (protocol === 'vless' || protocol === 'vmess') {
@@ -635,6 +646,7 @@ function generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, target
         outboundObj.tls = {
             enabled: true,
             server_name: targetSni,
+            alpn: ["http/1.1"],
             insecure: true
         };
     }
@@ -659,6 +671,12 @@ async function fetchServerInfo() {
         const data = await response.json();
         if (data.uuid) document.getElementById('uuidInput').value = data.uuid;
         window.serverActivePaths = data.paths;
+        if (data.engine) {
+            let genTransport = document.getElementById('transportSelect');
+            if (genTransport && (data.engine === 'ws' || data.engine === 'httpupgrade')) {
+                genTransport.value = data.engine;
+            }
+        }
     } catch (e) {}
 }
 
@@ -669,7 +687,9 @@ function buildRealityConfig(protocol, evt) {
     const uuid = document.getElementById('uuidInput').value.trim();
     let targetHost = railwayDomainStored || document.getElementById('domainSelect').value.trim();
     targetHost = targetHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const bugHost = document.getElementById('bugInput').value.trim() || 'v.whatsapp.net';
+    const bugHost = document.getElementById('bugInput').value.trim() || '1win-whatsapp.com';
+    const transportEl = document.getElementById('transportSelect');
+    const netType = transportEl ? transportEl.value : 'httpupgrade';
     
     const pathsMapping = window.serverActivePaths || { vless: '/vless-argo', vmess: '/vmess-argo', trojan: '/trojan-argo' };
     let basePath = pathsMapping[protocol] || '/' + protocol + '-argo';
@@ -679,19 +699,19 @@ function buildRealityConfig(protocol, evt) {
     const txt = document.getElementById('configText');
 
     let protoLabel = (protocol === 'vless' ? 'VLESS' : (protocol === 'vmess' ? 'VMESS' : 'TROJAN'));
-    let remark = 'REALITY-' + protoLabel + '-' + targetHost;
+    let remark = 'REALITY-' + protoLabel + '-' + netType.toUpperCase() + '-' + targetHost;
 
     let uriLink = '';
     if (protocol === 'vless') {
-        uriLink = 'vless://' + uuid + '@' + targetHost + ':443?encryption=none&security=tls&sni=' + bugHost + '&fp=firefox&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
+        uriLink = 'vless://' + uuid + '@' + targetHost + ':443?encryption=none&security=tls&sni=' + bugHost + '&alpn=http%2F1.1&fp=firefox&type=' + netType + '&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
     } else if (protocol === 'vmess') {
-        let vmessObj = { v: "2", ps: remark, add: targetHost, port: "443", id: uuid, aid: "0", scy: "auto", net: "ws", type: "none", host: targetHost, path: basePath, tls: "tls", sni: bugHost, fp: "chrome" };
+        let vmessObj = { v: "2", ps: remark, add: targetHost, port: "443", id: uuid, aid: "0", scy: "auto", net: netType, type: "none", host: targetHost, path: basePath, tls: "tls", sni: bugHost, alpn: "http/1.1", fp: "chrome" };
         uriLink = 'vmess://' + toBase64(JSON.stringify(vmessObj));
     } else {
-        uriLink = 'trojan://' + uuid + '@' + targetHost + ':443?security=tls&sni=' + bugHost + '&type=ws&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
+        uriLink = 'trojan://' + uuid + '@' + targetHost + ':443?security=tls&sni=' + bugHost + '&alpn=http%2F1.1&type=' + netType + '&host=' + targetHost + '&path=' + encodeURIComponent(basePath) + '#' + encodeURIComponent(remark);
     }
 
-    label.innerText = 'REALITY ' + protoLabel;
+    label.innerText = 'REALITY ' + protoLabel + ' (' + netType.toUpperCase() + ')';
     txt.innerText = uriLink;
     area.style.display = 'block';
 }
@@ -704,13 +724,16 @@ function buildConfig(protocol, type, evt) {
     const hostSelect = document.getElementById('domainSelect');
     const host = hostSelect.value.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''); 
     const bugHost = document.getElementById('bugInput').value.trim() || host; 
-    const engine = document.getElementById('engineSelect').value;
+    
+    const transportEl = document.getElementById('transportSelect');
+    const engineEl = document.getElementById('engineSelect');
+    const netType = transportEl ? transportEl.value : (engineEl ? engineEl.value : 'httpupgrade');
     
     const selectedPort = document.getElementById('portSelect') ? document.getElementById('portSelect').value : "443";
     const selectedFormat = document.getElementById('formatSelect') ? document.getElementById('formatSelect').value : "standard";
     const isTls = selectedPort === "443";
     const securityMode = isTls ? "tls" : "none";
-    const fpParam = isTls ? "&fp=chrome" : "";
+    const tlsExtraParams = isTls ? "&alpn=http%2F1.1&fp=chrome" : "";
 
     const area = document.getElementById('output-area');
     const label = document.getElementById('out-type');
@@ -724,10 +747,9 @@ function buildConfig(protocol, type, evt) {
     const pathsMapping = window.serverActivePaths || { vless: '/vless-argo', vmess: '/vmess-argo', trojan: '/trojan-argo' };
     let basePath = pathsMapping[protocol] || '/' + protocol + '-argo';
     
-    let remark = 'DDFATHU-' + protocol.toUpperCase() + '-' + type.toUpperCase() + '-' + selectedPort;
+    let remark = 'DDFATHU-' + protocol.toUpperCase() + '-' + netType.toUpperCase() + '-' + type.toUpperCase() + '-' + selectedPort;
     let configResult = '';
 
-    let netType = engine;
     let targetConnect = (type === 'sni') ? bugHost : host;
     let targetSni = (type === 'sni_reverse') ? bugHost : host;
     let targetWsHost = (type === 'sni_reverse') ? bugHost : host;
@@ -736,24 +758,26 @@ function buildConfig(protocol, type, evt) {
     // --- HASIL BERDASARKAN FORMAT PILIHAN ---
     if (selectedFormat === 'clash_proxy') {
         label.innerText = remark + ' (CLASH PROXY)';
-        configResult = generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
+        configResult = generateClashProxyOnly(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType);
     } 
     else if (selectedFormat === 'clash_mihomo') {
         label.innerText = remark + ' (CLASH MIHOMO)';
-        configResult = generateClashMihomo(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
+        configResult = generateClashMihomo(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType);
     } 
     else if (selectedFormat === 'singbox') {
         label.innerText = remark + ' (SINGBOX JSON)';
-        configResult = generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark);
+        configResult = generateSingBoxJson(protocol, targetConnect, selectedPort, uuid, targetSni, targetWsHost, finalPath, remark, netType);
     } 
     else {
-        // STANDARD V2RAY LINK (DEFAULT)
+        // STANDARD V2RAY / NEKOBOX LINK (DEFAULT)
         label.innerText = remark;
         if (protocol === 'vless') {
             let q = '?encryption=none&security=' + securityMode;
-            if (isTls) q += '&sni=' + targetSni + fpParam;
+            if (isTls) q += '&sni=' + targetSni + tlsExtraParams;
             q += '&type=' + netType;
-            if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
+            if (netType === 'ws' || netType === 'httpupgrade') {
+                q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
+            }
             
             configResult = 'vless://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
         } 
@@ -761,15 +785,17 @@ function buildConfig(protocol, type, evt) {
             let jsonVmess = {
                 v: "2", ps: remark, add: targetConnect, port: selectedPort, id: uuid, aid: "0",
                 scy: "auto", net: netType, type: "none", host: targetWsHost, path: finalPath,
-                tls: isTls ? "tls" : "", sni: isTls ? targetSni : "", fp: isTls ? "chrome" : ""
+                tls: isTls ? "tls" : "", sni: isTls ? targetSni : "", alpn: isTls ? "http/1.1" : "", fp: isTls ? "chrome" : ""
             };
             configResult = 'vmess://' + toBase64(JSON.stringify(jsonVmess));
         } 
         else if (protocol === 'trojan') {
             let q = '?security=' + securityMode;
-            if (isTls) q += '&sni=' + targetSni + fpParam;
+            if (isTls) q += '&sni=' + targetSni + tlsExtraParams;
             q += '&type=' + netType;
-            if (netType === 'ws') q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
+            if (netType === 'ws' || netType === 'httpupgrade') {
+                q += '&host=' + targetWsHost + '&path=' + encodeURIComponent(finalPath);
+            }
             
             configResult = 'trojan://' + uuid + '@' + targetConnect + ':' + selectedPort + q + '#' + encodeURIComponent(remark);
         }
