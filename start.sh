@@ -104,6 +104,11 @@ echo "[*] Memulai WS-Proxy untuk SSH Dropbear di Port Lokal 8880..."
 export WS_PORT="8880"
 node ws-proxy.js &
 
+echo "[*] Memulai WS-Xray Gateway (Filter Payload Enhanced) di Port 8882..."
+export XRAY_WS_PORT="8882"
+export XRAY_PORT="8001"
+node ws-xray.js &
+
 if [ -f /usr/local/bin/badvpn-udpgw ]; then
     echo "[*] Memulai BadVPN udpgw di Port Global ${UDPGW_PORT}..."
     /usr/local/bin/badvpn-udpgw --listen-addr 0.0.0.0:${UDPGW_PORT} --max-clients ${UDPGW_MAX_CLIENTS} --max-connections-for-client 50 &
