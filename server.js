@@ -20,7 +20,7 @@ const AUTO_ACCESS = process.env.AUTO_ACCESS || false;
 const FILE_PATH = process.env.FILE_PATH || '.tmp';   
 const SUB_PATH = process.env.SUB_PATH || 'sub';       
 
-const PORT = process.env.PORT || 8081; 
+const PORT = parseInt(process.env.PORT, 10) || 8081; // Port UI & gateway: ambil port aktif dari PaaS via env PORT, 8081 cuma fallback kalau jalan lokal tanpa env
 const UUID = process.env.UUID || '1f37ac4f-fdd0-49df-9406-1eda70a1d512'; 
 const ARGO_PORT = 8001;            
 const CFPORT = process.env.CFPORT || 443;                  
@@ -935,8 +935,8 @@ server.on('upgrade', (req, socket, head) => {
 // ========================================================
 // START LISTEN SERVER
 // ========================================================
-server.listen(PORT, () => {
-    console.log(`[UI & Xray Gateway Engine - HTTPUpgrade Ready] Running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[UI & Xray Gateway Engine - HTTPUpgrade Ready] Running on port ${PORT} (dari process.env.PORT)`);
     generateConfig().then(() => downloadFilesAndRun()).then(() => extractDomains()).catch(e => console.error(e));
     
     if (fs.existsSync(ZT_SINGLE_TOKEN_FILE)) {
