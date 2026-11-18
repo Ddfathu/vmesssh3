@@ -38,6 +38,8 @@ const ADMIN_PASS_FILE = "/tmp/admin_pass.txt";
 const STATS_PATH = "/tmp/server_stats.json";
 const DB_PATH = "/tmp/ssh_details.json";
 
+const UPGRADE_ROUTES = {}; // path -> { ws: port, httpupgrade: port } — diisi generateConfig(), dipakai handler upgrade buat routing WS vs HTTPUpgrade di path yang sama
+
 let cachedDiskUsage = "38%";
 let cachedSshOnline = "0 User";
 let cachedUserListDetails = "Semua user offline";
@@ -342,50 +344,49 @@ async function generateConfig() {
     streamSettingsObj = { network: "ws", security: "none" };
   }
 
-  vlessPaths.forEach(p => { 
-    const cp = nextPort++; 
-    fallbacksList.push({ path: p, dest: cp }); 
-    let st = JSON.parse(JSON.stringify(streamSettingsObj));
-    if (engine === 'ws') st.wsSettings = { path: p };
-    else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
+  // DUAL TRANSPORT: kalau engine ws/httpupgrade, DUA-DUANYA aktif barengan di path yang sama.
+  // Fallback master (8001, jalur tunnel) tetap nunjuk ke inbound httpupgrade kayak sebelumnya,
+  // sedangkan trafik upgrade langsung di port publik di-routing handler upgrade berdasarkan
+  // header Sec-WebSocket-Key (ada = WS asli, nggak ada = HTTPUpgrade) ke inbound masing-masing.
+  const dualTransport = (engine === 'ws' || engine === 'httpupgrade');
+  for (const k of Object.keys(UPGRADE_ROUTES)) delete UPGRADE_ROUTES[k];
 
-    inboundsList.push({ 
-        port: cp, listen: "127.0.0.1", protocol: 'vless', 
-        settings: { clients: [{ id: UUID, level: 0 }], decryption: "none" }, 
-        streamSettings: st, 
-        sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] } 
-    }); 
-  });
+  function addInbound(proto, settings, p) {
+    if (dualTransport) {
+        const wsPort = nextPort++;
+        const hupPort = nextPort++;
+        fallbacksList.push({ path: p, dest: hupPort });
+        inboundsList.push({
+            port: wsPort, listen: "127.0.0.1", protocol: proto,
+            settings: JSON.parse(JSON.stringify(settings)),
+            streamSettings: { network: "ws", security: "none", wsSettings: { path: p } },
+            sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
+        });
+        inboundsList.push({
+            port: hupPort, listen: "127.0.0.1", protocol: proto,
+            settings: JSON.parse(JSON.stringify(settings)),
+            streamSettings: { network: "httpupgrade", security: "none", httpupgradeSettings: { path: p } },
+            sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
+        });
+        UPGRADE_ROUTES[p] = { ws: wsPort, httpupgrade: hupPort };
+    } else {
+        const cp = nextPort++;
+        fallbacksList.push({ path: p, dest: cp });
+        let st = JSON.parse(JSON.stringify(streamSettingsObj));
+        if (engine === 'ws') st.wsSettings = { path: p };
+        else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
+        inboundsList.push({
+            port: cp, listen: "127.0.0.1", protocol: proto,
+            settings: settings,
+            streamSettings: st,
+            sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
+        });
+    }
+  }
 
-  vmessPaths.forEach(p => { 
-    const cp = nextPort++; 
-    fallbacksList.push({ path: p, dest: cp }); 
-    let st = JSON.parse(JSON.stringify(streamSettingsObj));
-    if (engine === 'ws') st.wsSettings = { path: p };
-    else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
-
-    inboundsList.push({ 
-        port: cp, listen: "127.0.0.1", protocol: "vmess", 
-        settings: { clients: [{ id: UUID, alterId: 0 }] }, 
-        streamSettings: st, 
-        sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] } 
-    }); 
-  });
-
-  trojanPaths.forEach(p => { 
-    const cp = nextPort++; 
-    fallbacksList.push({ path: p, dest: cp }); 
-    let st = JSON.parse(JSON.stringify(streamSettingsObj));
-    if (engine === 'ws') st.wsSettings = { path: p };
-    else if (engine === 'httpupgrade') st.httpupgradeSettings = { path: p };
-
-    inboundsList.push({ 
-        port: cp, listen: "127.0.0.1", protocol: "trojan", 
-        settings: { clients: [{ password: UUID }] }, 
-        streamSettings: st, 
-        sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] } 
-    }); 
-  });
+  vlessPaths.forEach(p => addInbound('vless', { clients: [{ id: UUID, level: 0 }], decryption: "none" }, p));
+  vmessPaths.forEach(p => addInbound("vmess", { clients: [{ id: UUID, alterId: 0 }] }, p));
+  trojanPaths.forEach(p => addInbound("trojan", { clients: [{ password: UUID }] }, p));
 
   inboundsList.unshift({
     port: ARGO_PORT,
@@ -547,16 +548,21 @@ async function generateLinks(argoDomain) {
   const currentEngine = netSettings.engine || 'httpupgrade';
   const linkType = (currentEngine === 'httpupgrade') ? 'httpupgrade' : 'ws';
 
-  const generated = buildCustomConfigLinks({
+  const linkParams = {
       domain: argoDomain,
       bugAddress: getActiveCfip(),
       sni: argoDomain,
       port: CFPORT,
-      transport: linkType,
       security: String(CFPORT) === '80' ? 'none' : 'tls',
       alpn: 'http/1.1',
       tagPrefix: nodeName
-  });
+  };
+  // /sub sekarang berisi link WS *dan* HTTPUpgrade (dua-duanya aktif barengan di server)
+  const generatedWs = buildCustomConfigLinks({ ...linkParams, transport: 'ws' });
+  const generatedHup = buildCustomConfigLinks({ ...linkParams, transport: 'httpupgrade' });
+  const generated = (linkType === 'ws')
+      ? { combined: `${generatedWs.combined}\n${generatedHup.combined}` }
+      : { combined: `${generatedHup.combined}\n${generatedWs.combined}` };
 
   subContent = Buffer.from(generated.combined).toString('base64');
   fs.writeFileSync(subPath, subContent);
@@ -928,7 +934,15 @@ server.on('upgrade', (req, socket, head) => {
         return forwardUpgradeStream(targetPort, req, socket, head);
     }
     
-    // Semua Request WebSocket & HTTPUpgrade (VLESS / VMess / Trojan) diteruskan ke Xray (Port 8001)
+    // Routing dual-transport: WS asli bawa header Sec-WebSocket-Key, HTTPUpgrade nggak.
+    // Path yang sama bisa melayani dua-duanya — tinggal diteruskan ke inbound yang cocok.
+    const route = UPGRADE_ROUTES[urlPath];
+    if (route) {
+        const targetPort = req.headers['sec-websocket-key'] ? route.ws : route.httpupgrade;
+        return forwardUpgradeStream(targetPort, req, socket, head);
+    }
+
+    // Path lain: teruskan ke master Xray (Port 8001, fallback by path)
     return forwardUpgradeStream(ARGO_PORT, req, socket, head);
 });
 
